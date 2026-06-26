@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Pomadex Finance</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#080810;--surface:#0f0f1a;--card:#141420;--card2:#1a1a28;
+  --border:#22223a;--border2:#2d2d4a;
+  --gold:#f5c842;--gold2:#e8a800;
+  --green:#00e676;--red:#ff4757;--orange:#ff6b35;--cyan:#00d4aa;
+  --blue:#40c4ff;--purple:#c56cf0;
+  --text:#f0f0fa;--muted:#5a5a8a;--muted2:#8888bb;--r:14px;
+  --pp:#f5c842;--sots:#40c4ff;--snare:#00d4aa;--pemax:#c56cf0;--pedro:#ff6b35;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif;min-height:100vh;}
+
+/* PIN SCREEN */
+#pinScreen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1000;gap:24px;}
+.pin-logo{height:80px;width:80px;object-fit:contain;border-radius:16px;margin-bottom:8px;}
+.pin-title{font-size:20px;font-weight:900;color:var(--gold);letter-spacing:1px;}
+.pin-sub{font-size:12px;color:var(--muted2);}
+.pin-dots{display:flex;gap:12px;margin:8px 0;}
+.pin-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--border2);transition:all .2s;}
+.pin-dot.filled{background:var(--gold);border-color:var(--gold);}
+.pin-keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:240px;}
+.pin-key{background:var(--card);border:1px solid var(--border2);color:var(--text);font-size:22px;font-weight:700;padding:18px;border-radius:12px;cursor:pointer;transition:all .15s;text-align:center;}
+.pin-key:active{background:var(--gold);color:#000;transform:scale(.95);}
+.pin-key.del{font-size:16px;color:var(--muted2);}
+.pin-key.empty{background:transparent;border:none;cursor:default;}
+.pin-error{color:var(--red);font-size:12px;font-weight:700;min-height:18px;}
+.pin-status{font-size:11px;color:var(--muted2);display:flex;align-items:center;gap:6px;}
+.pin-status .dot{width:6px;height:6px;border-radius:50%;background:var(--muted);}
+.pin-status .dot.online{background:var(--green);}
+
+/* HEADER */
+header{background:linear-gradient(135deg,#0a0a16,#12102a,#0a0a16);border-bottom:1px solid var(--border2);padding:12px 18px;position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.logo-wrap{display:flex;align-items:center;gap:10px;}
+.logo-img{height:44px;width:44px;object-fit:contain;border-radius:8px;}
+.logo-text{display:flex;flex-direction:column;}
+.logo-title{font-size:11px;font-weight:900;letter-spacing:2px;text-transform:uppercase;color:var(--gold);}
+.logo-sub{font-size:9px;color:var(--muted2);letter-spacing:1.5px;text-transform:uppercase;margin-top:2px;}
+.hdr-right{display:flex;align-items:center;gap:8px;}
+.hdr-sync{width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;}
+.hdr-sync.syncing{animation:pulse 1s infinite;background:var(--gold);}
+.hdr-sync.error{background:var(--red);}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.cur-sel,.year-sel{background:var(--card);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;}
+
+/* NAV */
+.nav{display:flex;overflow-x:auto;gap:5px;padding:10px 14px;background:var(--surface);border-bottom:1px solid var(--border);scrollbar-width:none;}
+.nav::-webkit-scrollbar{display:none;}
+.nb{flex-shrink:0;padding:6px 14px;border-radius:18px;border:1px solid var(--border2);background:transparent;color:var(--muted2);font-size:11px;font-weight:800;cursor:pointer;transition:all .15s;white-space:nowrap;letter-spacing:.3px;}
+.nb.active{border-color:transparent;color:#000!important;}
+.nb[data-p="overview"].active{background:var(--gold);}
+.nb[data-p="pedro"].active{background:var(--pedro);}
+.nb[data-p="pp"].active{background:var(--pp);}
+.nb[data-p="sots"].active{background:var(--sots);}
+.nb[data-p="snare"].active{background:var(--snare);}
+.nb[data-p="pemax"].active{background:var(--pemax);}
+
+main{padding:14px;max-width:880px;margin:0 auto;padding-bottom:80px;}
+
+/* LOADING */
+.loading{text-align:center;padding:60px 20px;color:var(--muted2);}
+.spinner{width:32px;height:32px;border:3px solid var(--border2);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* KPIS */
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
+@media(max-width:500px){.kpis{grid-template-columns:1fr 1fr;}}
+.kpi{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:14px 16px;position:relative;overflow:hidden;}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.kpi.g::before{background:var(--green);}
+.kpi.r::before{background:var(--red);}
+.kpi.y::before{background:var(--gold);}
+.kpi.o::before{background:var(--orange);}
+.kpi.b::before{background:var(--blue);}
+.kpi-label{font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;font-weight:700;}
+.kpi-val{font-size:22px;font-weight:900;letter-spacing:-1px;line-height:1;}
+.kpi-val.g{color:var(--green);}.kpi-val.r{color:var(--red);}.kpi-val.y{color:var(--gold);}.kpi-val.o{color:var(--orange);}.kpi-val.b{color:var(--blue);}
+.kpi-sub{font-size:10px;color:var(--muted);margin-top:4px;}
+
+/* CHART */
+.chart-box{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:16px;margin-bottom:14px;}
+.chart-box h3{font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px;font-weight:800;}
+.chart-wrap{position:relative;height:200px;}
+
+/* PROJ CARDS */
+.proj-list{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;}
+.proj-card{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:14px 16px;cursor:pointer;transition:all .15s;position:relative;overflow:hidden;}
+.proj-card:hover{transform:translateY(-1px);box-shadow:0 4px 20px rgba(0,0,0,.4);}
+.proj-card::after{content:'›';position:absolute;right:16px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:18px;}
+.pc-row1{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-right:20px;}
+.pc-name{font-size:13px;font-weight:800;display:flex;align-items:center;gap:8px;}
+.pc-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.pc-bal{font-size:16px;font-weight:900;}
+.pc-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden;display:flex;}
+.pc-bar-in{height:100%;}
+.pc-bar-out{height:100%;background:var(--red);opacity:.7;}
+.pc-row2{display:flex;gap:14px;margin-top:8px;flex-wrap:wrap;}
+.pc-stat{font-size:10px;color:var(--muted2);}
+.pc-stat span{color:var(--text);font-weight:700;}
+
+/* PROFIT BOX */
+.profit-box{background:linear-gradient(135deg,rgba(0,230,118,.06),rgba(245,200,66,.04));border:1px solid rgba(0,230,118,.2);border-radius:var(--r);padding:16px;margin-bottom:14px;}
+.profit-box h3{font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px;font-weight:800;}
+.profit-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);}
+.profit-row:last-child{border-bottom:none;}
+.profit-total{display:flex;justify-content:space-between;align-items:center;padding-top:12px;margin-top:4px;border-top:1px solid rgba(0,230,118,.2);}
+
+/* FORECAST */
+.forecast-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+@media(max-width:480px){.forecast-grid{grid-template-columns:1fr;}}
+.forecast-box{background:var(--card2);border:1px solid var(--border2);border-radius:var(--r);padding:14px;}
+.forecast-box h3{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.fc-btn{padding:9px 14px;border-radius:8px;border:none;font-size:12px;font-weight:800;cursor:pointer;width:100%;margin-top:4px;}
+.fc-btn.add-fc-in{background:rgba(245,200,66,.15);color:var(--gold);border:1px solid rgba(245,200,66,.3);}
+.fc-btn.add-fc-out{background:rgba(255,107,53,.15);color:var(--orange);border:1px solid rgba(255,107,53,.3);}
+
+/* SECT */
+.sect{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:var(--muted2);margin:16px 0 8px;display:flex;align-items:center;gap:6px;}
+.sect::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* FORM */
+.form-box{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:14px;margin-bottom:14px;display:grid;gap:10px;grid-template-columns:1fr 1fr;}
+@media(max-width:480px){.form-box{grid-template-columns:1fr;}}
+.form-box .full{grid-column:1/-1;}
+label{font-size:10px;color:var(--muted2);display:block;margin-bottom:4px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;}
+input,select{width:100%;background:var(--surface);border:1px solid var(--border2);color:var(--text);padding:9px 12px;border-radius:9px;font-size:13px;transition:border-color .15s;}
+input:focus,select:focus{outline:none;border-color:var(--gold);}
+select option{background:var(--surface);}
+.btn{padding:11px 16px;border-radius:9px;border:none;font-size:13px;font-weight:800;cursor:pointer;transition:all .15s;width:100%;}
+.btn:active{transform:scale(.97);}
+.btn-in{background:linear-gradient(135deg,#00e676,#00c853);color:#000;}
+.btn-out{background:linear-gradient(135deg,#ff4757,#c0392b);color:#fff;}
+.btn-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+
+/* TX */
+.tx-list{display:flex;flex-direction:column;gap:5px;}
+.tx{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:11px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.tx.fc-tx{border-color:rgba(245,200,66,.2);background:rgba(245,200,66,.03);}
+.tx.fc-tx-out{border-color:rgba(255,107,53,.2);background:rgba(255,107,53,.03);}
+.tx-l{display:flex;align-items:center;gap:10px;}
+.tx-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.tx-desc{font-size:13px;font-weight:600;line-height:1.2;}
+.tx-meta{font-size:10px;color:var(--muted);margin-top:2px;}
+.tx-amt{font-size:14px;font-weight:800;white-space:nowrap;}
+.tx-amt.in{color:var(--green);}.tx-amt.out{color:var(--red);}.tx-amt.fc-in{color:var(--gold);}.tx-amt.fc-out{color:var(--orange);}
+.tx-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:3px 7px;border-radius:5px;}
+.tx-del:hover{color:var(--red);}
+.empty{text-align:center;color:var(--muted);padding:36px 20px;font-size:13px;line-height:1.6;}
+.filter-row{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;}
+.chip{padding:4px 10px;border-radius:12px;font-size:10px;font-weight:800;border:1px solid var(--border);background:transparent;color:var(--muted2);cursor:pointer;transition:all .12s;}
+.chip.on{background:var(--gold);color:#000;border-color:var(--gold);}
+.tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:9px;font-weight:800;margin-left:5px;text-transform:uppercase;}
+.tag.fc{background:rgba(245,200,66,.15);color:var(--gold);}
+.tag.fc-out{background:rgba(255,107,53,.15);color:var(--orange);}
+.top-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;}
+.badge{display:inline-flex;align-items:center;gap:5px;background:rgba(245,200,66,.1);color:var(--gold);border:1px solid rgba(245,200,66,.25);border-radius:8px;padding:4px 10px;font-size:10px;font-weight:800;}
+.cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:14px;}
+.cat-item{background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;}
+.cat-name{font-size:9px;color:var(--muted2);margin-bottom:4px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;}
+.cat-val{font-size:18px;font-weight:900;color:var(--red);}
+
+/* SETUP SCREEN */
+#setupScreen{position:fixed;inset:0;background:var(--bg);z-index:500;overflow-y:auto;padding:40px 20px;display:none;}
+.setup-box{max-width:480px;margin:0 auto;background:var(--card);border:1px solid var(--border2);border-radius:20px;padding:28px;}
+.setup-title{font-size:18px;font-weight:900;color:var(--gold);margin-bottom:6px;}
+.setup-sub{font-size:12px;color:var(--muted2);margin-bottom:24px;line-height:1.6;}
+.setup-step{display:flex;gap:12px;margin-bottom:16px;align-items:flex-start;}
+.step-num{background:var(--gold);color:#000;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;flex-shrink:0;margin-top:2px;}
+.step-text{font-size:12px;color:var(--muted2);line-height:1.6;}
+.step-text b{color:var(--text);}
+.setup-input{width:100%;background:var(--surface);border:1px solid var(--border2);color:var(--text);padding:12px 14px;border-radius:10px;font-size:13px;margin:10px 0;}
+.setup-input:focus{outline:none;border-color:var(--gold);}
+.setup-btn{width:100%;padding:14px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#000;border:none;border-radius:10px;font-size:14px;font-weight:900;cursor:pointer;margin-top:8px;}
+.setup-status{font-size:12px;margin-top:8px;min-height:20px;font-weight:700;}
+.setup-status.ok{color:var(--green);}.setup-status.err{color:var(--red);}
+</style>
+</head>
+<body>
+
+<!-- PIN SCREEN -->
+<div id="pinScreen" style="display:flex">
+  <img class="pin-logo" src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCACgAKADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD4yooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKfFFJLKkUSNJI7BURBksTwAAOpoAZRW9rXgzxfoln9t1nwtrenW2AfOurCWJOcAfMygdx+dYNABRS4oxQAlFKQR2pWjdVDMjAHoSOtADaK9U+EPwE+IXxP0eXWfD9pZW+mxyGJbq+uPKSVx94IACzYzycY7ZzS+Nf2ffih4U8LjxLfaEt1pYTzJZrKYTmFOu91HzKuOc4wO+KAPKqK3fh/o1r4i8daDoF7dPa22pajBaSzIMtGskiqSB6817N+1v8CdE+EdpoF/4bvdWvbS/eWG5a+kiby5FClNu0KfmG/tgbevNAHz5RS4NJQAUV634N+B+q634KsfFepa3Z6NY34uHhMsEkvlxRRs5mm2cxxkRykHBJEZOCOa8x13TLnRtXutMu9hlt5ChZMlHHZ1JAyrDDA9wQe9AFKiiigAooooA9J/ZhtdNvfj54QtNWsre+s5b8I8FwgeNiUbblTwcNtPPpX1L+2t410vwDa+GdG0vwtaR3rX1vrFtdxKkSI1rMG2FVXJzxyD3r5R/Zycp8ePA7Btv/E8tRn6yAV9qftsfDXRPF/gf/hKNR106Xd+HrO5a0RmRY7hm2NtYtz/BwF55oA6j9n74raT8cfBmpy3fhwWZtZhbXtlcMLmGVWXcCCVAYHnII4xXmfxP+FPwz+D3wn8deK9R0O01PVNWluYtOZ7dHWyM7MLeOFG+VRGCGJAydpxwAK7Hwv4o+BnwJ+GUttoPinSrqLabto4NQS5u7+YoADhSeWwoHAUe3NL4otYP2k/2Y430i7srbUryOK4VdxMdtexHLwv3A+8ucdGDcjqAY3w2k+HX7SvwdubHUPDdlp+sWEK2c8kdtGJbOYplJoWUDCEgkLwOGUgjk5fiPTPAvw9/Zc8Maz4y8CWGuXumfZojbrFHGZ7kMwxJJtJMeQWIOQ2ACDmk/Yg8Bat8Nrbx/deLpYtOntrqG1uYGlBSJYovOMpccFSswwc9jVj9sTWLPXf2U7LWLB4ltr+7sriNVkAyr7mAx3OCCR2/CgDQfWPhJ4q+ANv8aNf+F2mrFp5adbOOCPzPNSbyQu9QodC2DhhjHJHFdT8MPFPhf49fBjUb3UfClvZWLST2FxZzbZVQoikMjhR0DqQQAQRx0zXmjWLad/wTkMEiqGk0gT8cgiS8Dj8cMK6P9jSyex/ZWe6hCeZeyahcruPGRmMZx/1zFAHMeCNJ+OOkfsrrDZax4S8L2Ntp8l1bSvDIt4tmVeUszgmNJGz125AOSQ3T2X9m3RfEWm/BbRtM8W61Y64zWy/ZZLdcqlo0a7Imb+MqMjdjpgc4yeE+KNj4W+Ov7PulSaH49stCt4TbysZbkLAkm0IYLhMgggtgf7QGMg16L4A8NaX8HPgyNN05rrV7bRrWa7nkRcy3LDMkhVQSMnnCg9gPegDwf4v+I/hL8J/j74b0ifwHYppUWjeVfGCxQLCXnjeCdeMu8ZiYlgc/NwSQRXc/tReCNP8AiP4/+E/h++dxYXeoXpneI4LQrbrMyg9twjxntnNcl+1H4O8B/FY+CfHuk+K7BLO61O30e9voZVK/Z5SzAkk/I6ENw2PvnPSuy/aE8YaZoHw68HfE/wAJ3Vpq1v4e1eCaIxzgi4tZYZLeRAeoJVxzjgjOODQBl6v4O8DXHxttvh1c/Aax/sA6YfL1i3gRPTMhKMG2A4TcTvDHPQ8/OXj39mzxZbeIfFR8Hraapp2kaulklmlzuvUWby2hLJjptmTLZ6Bj0Br1LXPGH7O3ifxsPijqXxE8X2V1PGizaFC9xEytgDAMYyq8BiEfBPOecUvwQ+Jnwx8Iax4o+I174tvXm8SarFY2ukXF7JPc21msgRZ7guSWIXLZ3NtT5QSTigDhtX1PVv2fdI/4QrXre3m166EF00+kat5iywRvIFiuI5omCbkllT5eGQjKnGT4V8QvEreLvF99r50+DTkuPLSG0hYskEUcaxxoC3JwiKMnr1rv/wBrew0aP4xahrfh/wAVWfiTTtcH26OeC9W4aFiSrQsQTjaV+UdkKjtXkNABRRRQAUUUUAdr8CL+HTPjP4Ovp1do4tZtSQr7TzIAOfTJGfbNfbv7e3h9da+DNndtIIV07WraSWUrnZHJuhJx35kU49q/PCCWWCZJ4JHiljYOjoxDKwOQQR0INdD4i8d+NfEmnRabr/izXNVs4jlILu+klQEdDhjjPvQB9D+MfgN8E/APjPSfDXjb4jeILebU7UzRyRWaoikyBELOEcBSQ/XptGSB10NZ+Bfxk+Dmsarrfwq8XSNokFr9pZpbhI3lxndG8LAxuygZ3EAYIxg5x6J+0Jf/AA00nQPh58QfiJ4W1XxBcCCKKA2kwWMHyhLiRWZQw3HIHsc8cHnNA/aS8O/EC88f2niS9tvDGi3Ph/7FpVveSF2kkYSiR22gjcd68DoFHXmgDifiP8H/AIqS6LrfjD4lfFbSrSyvJbZZmW8doLtzsQDYgVAEyR0/gOBjmuY179lT4qW2uJpuhJY6/pUlsLqDUoLtYrdlPQHeRhj1AGQQQc9cbcXj/wCHfjf9k7T/AIe+Idfbw7rvh6eOSBTbNIt1tdwGXaOcpIcgkEEZ5Fes+L/i78IfEnws1b4TaR8QZdL+y6LBa2usT2rrFcCILlFPBJIQKwO3O87c4NAGX4k/ZsXVvDXgvwlourz+EL640aS41y2kup7qK5nj+z7v3fmbOJJGORxyMdBXE/s3/B7XPGfw21efQ/ib4h0Sa31ltOubC0maO3aIGPzXIDckxsxAx1ABrv5vjF8OvAtz8Lrux8ZxeJbHSNNudE1N7bc1wqskBWcxHB2h4frg8ZxVD4XfHD4FfDC98U22h6p4jvrDU9VN2gax3fMyDcyE7f3eTgBhu+U54INAHMeIPgx8B7Xxrr/w4j8a3+ka5YaZHcJqGqXkawC4J3GNsqqthGjJAOfmOOQa2dL8MaX4I/Y21HWtF8e2ceqakzyDVEmmRS4XEllFtbDMTFIgYjDbicdCMbx+37Mvi3xx4o8f+IPG+q3iahbwSW+n2UUkcwm2bX2ho+vyKMMdo3Nk9Mcj4o8c/DjXf2SdC8ER65qNh4h0O5e4i0/7Gzrcu0kmN0gGwDZKWznORjFADf8AhnPVdV8caZ4Z0K8u9Psj4cttZ1e+1kKkVuz7w20IfmXKkDJzw2TgZq98Pf2V9Y8XyWl7Z+MtNn8MXgufJ1SyiM2JIpCih4iy43gFgQTjoeSM+hXnx6+Fz3d14fvdWvJtF1vwVb6VeahZ2r+ba3MazKyYZQSCsx5AIDAdQSRe+B/x0+DPww8F6D4Jttc1G9iFpJeahqBsJNqXTsrGEKF3Hq3IBACDkk8AHip/Zr1+9+Hw8VeG/FOh66y6gLKeyt3IeJmmWJctyA+XVmQ42g9TVrxr+zgdG1nWfD+leO9Lv9a0TQ11a9s54Gty45LJESSGwoBycffUHHbt/gp41+GrfArxB4K1T4hL4a1fWPELXaXLWsm+BfOhaOQHhf8AllnO4bc89Oes+Jmt+HvFXwO8WJ8V9X8IajqWkzT2nhzWdNlQ3V9Iiko6xqcqWbAYKdh+Y4AAJAPhw0UGigAooooAKKKKACiiigD0Xxf8ZPGfir4aaT8PtWk099G0oQi32WoWU+UhRNz57KSOAM9687BI6UlFABS5PrSUUAFFFFAC5PrWn4ck0GOa8bX4NQmT7HL9kFnIiYucfujJuBzHn7wGDjoay6KAPpO7+PfhC78QnVH07xDCGt4EtlSCzP8AZQjuIZWtbfAG6B1iKEuc4x8uCwMnh79ojw9p11Ym30nVNKtYLmyke2s4ICixpdXUtyik4OHimhj7ZCMDgYr5oooAs6nPHcajczwrsjkld1XGMAsSBgVXzSUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQB/9k=" alt="Pomadex">
+  <div class="pin-title">POMADEX FINANCE</div>
+  <div class="pin-sub">Insere o teu PIN de 4 dígitos</div>
+  <div class="pin-dots">
+    <div class="pin-dot" id="pd0"></div>
+    <div class="pin-dot" id="pd1"></div>
+    <div class="pin-dot" id="pd2"></div>
+    <div class="pin-dot" id="pd3"></div>
+  </div>
+  <div id="pinError" class="pin-error"></div>
+  <div class="pin-keypad">
+    <button class="pin-key" onclick="pressKey('1')">1</button>
+    <button class="pin-key" onclick="pressKey('2')">2</button>
+    <button class="pin-key" onclick="pressKey('3')">3</button>
+    <button class="pin-key" onclick="pressKey('4')">4</button>
+    <button class="pin-key" onclick="pressKey('5')">5</button>
+    <button class="pin-key" onclick="pressKey('6')">6</button>
+    <button class="pin-key" onclick="pressKey('7')">7</button>
+    <button class="pin-key" onclick="pressKey('8')">8</button>
+    <button class="pin-key" onclick="pressKey('9')">9</button>
+    <button class="pin-key empty"></button>
+    <button class="pin-key" onclick="pressKey('0')">0</button>
+    <button class="pin-key del" onclick="delKey()">⌫</button>
+  </div>
+  <div class="pin-status" id="pinNetStatus">
+    <div class="pin-dot" id="netDot"></div>
+    <span id="netLabel">A verificar conexão...</span>
+  </div>
+</div>
+
+<!-- SETUP SCREEN -->
+<div id="setupScreen">
+  <div class="setup-box">
+    <div class="setup-title">⚙ Configurar Google Sheets</div>
+    <div class="setup-sub">Liga o app ao teu Google Sheets para guardar os dados na nuvem. Segue os 4 passos abaixo:</div>
+    <div class="setup-step"><div class="step-num">1</div><div class="step-text">Vai a <b>script.google.com</b> → clica em <b>Novo Projecto</b></div></div>
+    <div class="setup-step"><div class="step-num">2</div><div class="step-text">Apaga o código que aparece e cola o conteúdo do ficheiro <b>pomadex-apps-script.js</b> que já está no teu download. Muda o <b>DEFAULT_PIN</b> para o PIN que quiseres.</div></div>
+    <div class="setup-step"><div class="step-num">3</div><div class="step-text">Clica em <b>Implementar → Nova implementação → Aplicação web</b> → Acesso: <b>Qualquer pessoa</b> → Clica <b>Implementar</b> → Autoriza → Copia o URL</div></div>
+    <div class="setup-step"><div class="step-num">4</div><div class="step-text">Cola o URL abaixo e clica <b>Testar & Guardar</b></div></div>
+    <input class="setup-input" id="apiUrlInput" type="url" placeholder="https://script.google.com/macros/s/ABC.../exec">
+    <button class="setup-btn" id="setupTestBtn" onclick="testAndSaveUrl()">Testar & Guardar</button>
+    <div id="setupStatus" class="setup-status"></div>
+    <button onclick="document.getElementById('setupScreen').style.display='none'" style="width:100%;padding:10px;background:none;border:1px solid var(--border2);color:var(--muted2);border-radius:10px;cursor:pointer;font-size:12px;margin-top:8px">Fechar (usar modo offline)</button>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="mainApp" style="display:none">
+  <header>
+    <div class="logo-wrap">
+      <img class="logo-img" src="data:image/jpeg;base64,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" alt="Pomadex">
+      <div class="logo-text">
+        <div class="logo-title">Pomadex Productions</div>
+        <div class="logo-sub">Finance Dashboard</div>
+      </div>
+    </div>
+    <div class="hdr-right">
+      <div class="hdr-sync" id="syncDot"></div>
+      <select class="cur-sel" id="curSel" onchange="changeCurrency(this.value)">
+        <option value="EUR">€ EUR</option>
+        <option value="USD">$ USD</option>
+        <option value="BRL">R$ BRL</option>
+      </select>
+      <select class="year-sel" id="yearSel" onchange="render()">
+        <option value="2025">2025</option>
+        <option value="2026" selected>2026</option>
+        <option value="2027">2027</option>
+      </select>
+    </div>
+  </header>
+  <div class="nav">
+    <button class="nb active" data-p="overview" onclick="go('overview')">📊 Overview</button>
+    <button class="nb" data-p="pedro" onclick="go('pedro')">👤 Pedro Maximo</button>
+    <button class="nb" data-p="pp" onclick="go('pp')">🎛 Pomadex Prod.</button>
+    <button class="nb" data-p="sots" onclick="go('sots')">🎵 S.O.T.S.</button>
+    <button class="nb" data-p="snare" onclick="go('snare')">🥁 Clube do Snare</button>
+    <button class="nb" data-p="pemax" onclick="go('pemax')">🎤 PEMAX</button>
+  </div>
+  <main id="app"></main>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// POMADEX FINANCE — Frontend App
+// ══════════════════════════════════════════════════════════════
+
+const IMPORTED_DATA = [{"id":41,"proj":"pemax","type":"in","amount":250.0,"desc":"04. DJING CLASS 7 - HARSHIT","cat":"PEMAX","date":"2026-01-08","month":"JANUARY 2026"},{"id":42,"proj":"personal","type":"out","amount":30.0,"desc":"JANTAR","cat":"ORTEGA","date":"2026-01-07","month":"JANUARY 2026"},{"id":51,"proj":"pemax","type":"in","amount":15.0,"desc":"01. CLASS MUSIC - HIGTHAO EXTRA DIFERENÇA R$100","cat":"PEMAX","date":"2026-01-08","month":"JANUARY 2026"},{"id":52,"proj":"personal","type":"out","amount":131.0,"desc":"IPAD 13TH M4 - WEEK 5/16","cat":"APPLE - PHONENEXT","date":"2026-01-07","month":"JANUARY 2026"},{"id":62,"proj":"personal","type":"out","amount":500.0,"desc":"RENT SINGLE TEMPORARY HOUSE","cat":"DUBLIN RENT","date":"2026-01-09","month":"JANUARY 2026"},{"id":72,"proj":"personal","type":"out","amount":25.0,"desc":"NOTION","cat":"SUBSCRIPTION","date":"2026-01-09","month":"JANUARY 2026"},{"id":82,"proj":"personal","type":"out","amount":15.2,"desc":"ADOBE CLOUD R$95","cat":"SUBSCRIPTION","date":"2026-01-09","month":"JANUARY 2026"},{"id":92,"proj":"personal","type":"out","amount":52.18,"desc":"LIDL","cat":"FOOD / DRINK","date":"2025-12-09","month":"JANUARY 2026"},{"id":101,"proj":"pemax","type":"in","amount":250.0,"desc":"04. DJING CLASS - HUMBERTO 3/4","cat":"PEMAX","date":"2026-01-08","month":"JANUARY 2026"},{"id":102,"proj":"personal","type":"out","amount":5.0,"desc":"TFI","cat":"LEAP CARD","date":"2025-12-21","month":"JANUARY 2026"},{"id":111,"proj":"sots","type":"in","amount":350.0,"desc":"02. MANAGEMENT DE CARREIRA - TONI GROOVE 2/2","cat":"S.O.T.S CLUB","date":"2026-01-09","month":"JANUARY 2026"},{"id":112,"proj":"pp","type":"out","amount":2.89,"desc":"ADS INSTAGRAM","cat":"META","date":"2026-01-21","month":"JANUARY 2026"},{"id":121,"proj":"personal","type":"out","amount":350.0,"desc":"REELBOLSO CALÇÃO","cat":"DUBLIN RENT","date":"2026-01-09","month":"JANUARY 2026"},{"id":122,"proj":"sots","type":"out","amount":2.0,"desc":"DRIVE SOTS","cat":"SUBSCRIPTION","date":"2026-01-22","month":"JANUARY 2026"},{"id":132,"proj":"pp","type":"in","amount":100.0,"desc":"PAGAMENTOS","cat":"CLEITON","date":"2025-12-23","month":"JANUARY 2026"},{"id":142,"proj":"pp","type":"out","amount":8.67,"desc":"ADS INSTAGRAM","cat":"META","date":"2026-01-26","month":"JANUARY 2026"},{"id":152,"proj":"pp","type":"out","amount":5.0,"desc":"ADS INSTAGRAM","cat":"META","date":"2026-01-27","month":"JANUARY 2026"},{"id":162,"proj":"personal","type":"out","amount":5.0,"desc":"TFI","cat":"LEAP CARD","date":"2025-12-29","month":"JANUARY 2026"},{"id":172,"proj":"personal","type":"out","amount":9.55,"desc":"TESCO","cat":"FOOD / DRINK","date":"2025-12-29","month":"JANUARY 2026"},{"id":181,"proj":"pp","type":"in","amount":200.0,"desc":"ILLUSTRATION SOLUCTIONS - BIOTTO 1/2","cat":"POMADEX PRODUCTIONS","date":"2026-02-05","month":"JANUARY 2026"},{"id":182,"proj":"personal","type":"out","amount":6.75,"desc":"BK","cat":"FOOD / DRINK","date":"2025-12-29","month":"JANUARY 2026"},{"id":192,"proj":"personal","type":"out","amount":15.42,"desc":"ADOBE CLOUD R$95","cat":"SUBSCRIPTION","date":"2026-01-30","month":"JANUARY 2026"},{"id":202,"proj":"personal","type":"out","amount":8.3,"desc":"GALWAY","cat":"IRISH RAIL","date":"2025-12-30","month":"JANUARY 2026"},{"id":212,"proj":"personal","type":"out","amount":20.0,"desc":"INTERNET","cat":"THREE","date":"2026-01-30","month":"JANUARY 2026"},{"id":222,"proj":"personal","type":"out","amount":180.0,"desc":"GALWAY","cat":"TRIP","date":"2025-12-29","month":"JANUARY 2026"},{"id":232,"proj":"personal","type":"out","amount":9.99,"desc":"ICLOUD","cat":"SUBSCRIPTION","date":"2026-01-22","month":"JANUARY 2026"},{"id":282,"proj":"personal","type":"out","amount":8.85,"desc":"GALWAY","cat":"FOOD / DRINK","date":"2026-01-05","month":"JANUARY 2026"},{"id":291,"proj":"pp","type":"in","amount":100.0,"desc":"ILLUSTRATION SOLUCTIONS - BIOTTO 2/2","cat":"POMADEX PRODUCTIONS","date":"2026-01-28","month":"JANUARY 2026"},{"id":292,"proj":"personal","type":"out","amount":115.0,"desc":"MEDICATION 10G + PALHA ITALIANA","cat":"LUIS","date":"2026-01-13","month":"JANUARY 2026"},{"id":301,"proj":"pemax","type":"in","amount":400.0,"desc":"01. CLASS MUSIC / PRODUÇÃO MUSICAL - GIO 1/2","cat":"PEMAX","date":"2026-01-30","month":"JANUARY 2026"},{"id":302,"proj":"pp","type":"out","amount":40.0,"desc":"4 DIGITAL MASTERS","cat":"SOTS / DDR","date":"2026-01-14","month":"JANUARY 2026"},{"id":312,"proj":"personal","type":"out","amount":35.0,"desc":"FOOD","cat":"FOOD / DRINK","date":"2026-01-14","month":"JANUARY 2026"},{"id":322,"proj":"personal","type":"out","amount":35.45,"desc":"RELOGIO","cat":"AMAZON","date":"2026-01-15","month":"JANUARY 2026"},{"id":332,"proj":"personal","type":"out","amount":145.0,"desc":"GALWAY TRIP 1 W/ VI","cat":"FOOD / DRINK","date":"2025-12-19","month":"JANUARY 2026"},{"id":342,"proj":"personal","type":"out","amount":18.94,"desc":"MARKET","cat":"FOOD / DRINK","date":"2025-12-29","month":"JANUARY 2026"},{"id":352,"proj":"pp","type":"out","amount":17.18,"desc":"ADS INSTAGRAM","cat":"META","date":"2026-01-21","month":"JANUARY 2026"},{"id":641,"proj":"pemax","type":"in","amount":125.0,"desc":"04. DJING CLASS - ALINE 1/2","cat":"PEMAX","date":"2026-02-04","month":"fevereiro 2026"},{"id":642,"proj":"personal","type":"out","amount":21.73,"desc":"SPAR","cat":"FOOD / DRINK","date":"2026-02-01","month":"fevereiro 2026"},{"id":651,"proj":"pemax","type":"in","amount":300.0,"desc":"04. DJING CLASS - LÉO 10 LESSONS 1/3","cat":"PEMAX","date":"2026-02-05","month":"fevereiro 2026"},{"id":652,"proj":"personal","type":"out","amount":12.6,"desc":"DARIUS","cat":"FOOD / DRINK","date":"2026-02-01","month":"fevereiro 2026"},{"id":661,"proj":"pemax","type":"in","amount":250.0,"desc":"04. DJING CLASS - HUMBERTO 4/4","cat":"PEMAX","date":"2026-02-05","month":"fevereiro 2026"},{"id":662,"proj":"personal","type":"out","amount":15.98,"desc":"BOOTS","cat":"PERSONAL STUFF","date":"2026-02-02","month":"fevereiro 2026"},{"id":671,"proj":"pemax","type":"in","amount":180.0,"desc":"01. CLASS MUSIC / PRODUÇÃO MUSICAL - GIO 2/2","cat":"PEMAX","date":"2026-02-05","month":"fevereiro 2026"},{"id":672,"proj":"personal","type":"out","amount":35.0,"desc":"LEVI'S","cat":"PERSONAL STUFF","date":"2026-02-02","month":"fevereiro 2026"},{"id":681,"proj":"personal","type":"out","amount":15.0,"desc":"CLEITON","cat":"PESSOAL","date":"2026-02-05","month":"fevereiro 2026"},{"id":682,"proj":"personal","type":"out","amount":22.4,"desc":"PASTEL","cat":"FOOD / DRINK","date":"2026-02-02","month":"fevereiro 2026"},{"id":691,"proj":"pemax","type":"in","amount":250.0,"desc":"04. DJING CLASS - VICTOR","cat":"PEMAX","date":"2026-02-06","month":"fevereiro 2026"},{"id":692,"proj":"personal","type":"out","amount":48.15,"desc":"PENNEYS","cat":"PERSONAL STUFF","date":"2026-02-02","month":"fevereiro 2026"},{"id":702,"proj":"personal","type":"out","amount":6.0,"desc":"ASHA","cat":"PERSONAL STUFF","date":"2026-02-02","month":"fevereiro 2026"},{"id":712,"proj":"personal","type":"out","amount":5.0,"desc":"TFI","cat":"LEAP CARD","date":"2026-02-02","month":"fevereiro 2026"},{"id":722,"proj":"personal","type":"out","amount":46.14,"desc":"PIZZA","cat":"FOOD / DRINK","date":"2026-02-02","month":"fevereiro 2026"},{"id":732,"proj":"personal","type":"out","amount":8.1,"desc":"GOOGLE ONE","cat":"SUBSCRIPTION","date":"2026-02-03","month":"fevereiro 2026"},{"id":742,"proj":"personal","type":"out","amount":27.56,"desc":"LIDL","cat":"FOOD / DRINK","date":"2026-02-02","month":"fevereiro 2026"},{"id":752,"proj":"personal","type":"out","amount":50.0,"desc":"Starlink Internet","cat":"SUBSCRIPTION","date":"2026-02-04","month":"fevereiro 2026"},{"id":762,"proj":"pp","type":"out","amount":95.12,"desc":"G4M 4 Channel Rotary DJ Mixer 3/3","cat":"INVESTIMENTS","date":"2026-02-05","month":"fevereiro 2026"},{"id":771,"proj":"pemax","type":"in","amount":125.0,"desc":"04. DJING CLASS - ALINE 2/2","cat":"PEMAX","date":"2026-02-08","month":"fevereiro 2026"},{"id":772,"proj":"personal","type":"out","amount":50.0,"desc":"MEDICATION 5G","cat":"GIO","date":"2026-02-05","month":"fevereiro 2026"},{"id":781,"proj":"pemax","type":"in","amount":250.0,"desc":"04. DJING CLASS - MARIA","cat":"PEMAX","date":"2026-02-10","month":"fevereiro 2026"},{"id":782,"proj":"personal","type":"out","amount":800.0,"desc":"MARCH RENT HOUSE","cat":"DUBLIN RENT","date":"2026-02-06","month":"fevereiro 2026"},{"id":792,"proj":"personal","type":"out","amount":131.0,"desc":"IPAD 13TH M4 - WEEK 6/16","cat":"APPLE - PHONENEXT","date":"2026-02-08","month":"fevereiro 2026"},{"id":802,"proj":"personal","type":"out","amount":5.0,"desc":"TFI","cat":"LEAP CARD","date":"2026-02-09","month":"fevereiro 2026"},{"id":812,"proj":"personal","type":"out","amount":9.0,"desc":"PASTEL","cat":"FOOD / DRINK","date":"2026-02-09","month":"fevereiro 2026"},{"id":822,"proj":"personal","type":"out","amount":12.7,"desc":"CIRCLE K","cat":"FOOD / DRINK","date":"2026-02-09","month":"fevereiro 2026"},{"id":842,"proj":"sots","type":"out","amount":35.6,"desc":"PRINTING","cat":"SOTS X BASEMENTS","date":"2026-02-10","month":"fevereiro 2026"},{"id":852,"proj":"sots","type":"out","amount":10.84,"desc":"TEMU 1/3","cat":"SOTS X BASEMENTS","date":"2026-02-10","month":"fevereiro 2026"},{"id":872,"proj":"personal","type":"out","amount":42.7,"desc":"LIDL + COFFEE","cat":"FOOD / DRINK","date":"2026-02-11","month":"fevereiro 2026"},{"id":882,"proj":"personal","type":"out","amount":27.0,"desc":"DRINK + MERCADO","cat":"TONI","date":"2026-02-12","month":"fevereiro 2026"},{"id":892,"proj":"personal","type":"out","amount":100.0,"desc":"CARTÃO CRED. JANDIRA (JANEIRO) 8/36 1/2 R$600","cat":"CARTÃO","date":"2025-12-19","month":"fevereiro 2026"},{"id":902,"proj":"personal","type":"out","amount":50.0,"desc":"EMPRESTIMO R$300","cat":"GABRIEL","date":"2025-12-12","month":"fevereiro 2026"},{"id":912,"proj":"personal","type":"out","amount":55.0,"desc":"HASH + PALHA","cat":"LUIS","date":"2025-12-12","month":"fevereiro 2026"},{"id":932,"proj":"personal","type":"out","amount":5.0,"desc":"TFI","cat":"LEAP CARD","date":"2026-02-13","month":"fevereiro 2026"},{"id":941,"proj":"pemax","type":"in","amount":450.0,"desc":"04. DJING CLASS - KERRY","cat":"PEMAX","date":"2026-02-18","month":"fevereiro 2026"},{"id":942,"proj":"personal","type":"out","amount":22.0,"desc":"FOOD","cat":"FOOD / DRINK","date":"2026-02-16","month":"fevereiro 2026"},{"id":952,"proj":"pp","type":"out","amount":10.0,"desc":"ADS INSTAGRAM","cat":"META","date":"2026-02-17","month":"fevereiro 2026"},{"id":962,"proj":"personal","type":"out","amount":131.0,"desc":"IPAD 13TH M4 - WEEK 7/16","cat":"APPLE - PHONENEXT","date":"2026-02-18","month":"fevereiro 2026"},{"id":972,"proj":"personal","type":"out","amount":117.0,"desc":"IPAD 13TH M4 - WEEK 8/16","cat":"APPLE - PHONENEXT","date":"2026-02-18","month":"fevereiro 2026"},{"id":982,"proj":"personal","type":"out","amount":47.96,"desc":"FOOD","cat":"LIDLS","date":"2026-02-18","month":"fevereiro 2026"},{"id":991,"proj":"pemax","type":"in","amount":150.0,"desc":"04. DJING CLASS - LÉO 10 LESSONS 2/3","cat":"PEMAX","date":"2026-02-20","month":"fevereiro 2026"},{"id":992,"proj":"personal","type":"out","amount":42.0,"desc":"CAFE + SUPERVALU","cat":"FOOD / DRINK","date":"2026-02-19","month":"fevereiro 2026"},{"id":1002,"proj":"personal","type":"out","amount":10.0,"desc":"APPLE","cat":"SUBSCRIPTION","date":"2026-02-20","month":"fevereiro 2026"},{"id":1012,"proj":"personal","type":"out","amount":50.0,"desc":"MEDICATION 5G","cat":"GIO","date":"2026-02-21","month":"fevereiro 2026"},{"id":1021,"proj":"personal","type":"out","amount":35.0,"desc":"CLEITON BIOTTO","cat":"PEDRO MAXIMO","date":"2026-02-24","month":"fevereiro 2026"},{"id":1022,"proj":"personal","type":"out","amount":25.0,"desc":"25 euros","cat":"LUIS","date":"2026-02-20","month":"fevereiro 2026"},{"id":1032,"proj":"personal","type":"out","amount":54.0,"desc":"PIZZAS","cat":"DELIVEROO","date":"2026-02-22","month":"fevereiro 2026"},{"id":1042,"proj":"personal","type":"out","amount":48.0,"desc":"FOOD","cat":"LIDLS","date":"2026-02-22","month":"fevereiro 2026"},{"id":1052,"proj":"sots","type":"out","amount":2.0,"desc":"GOOGLE SOTS","cat":"SUBSCRIPTION","date":"2026-02-22","month":"fevereiro 2026"},{"id":1062,"proj":"personal","type":"out","amount":10.0,"desc":"FOOD","cat":"CIRCLE K","date":"2026-02-23","month":"fevereiro 2026"},{"id":1082,"proj":"pp","type":"out","amount":48.0,"desc":"ADS INSTAGRAM","cat":"META","date":"2026-01-24","month":"fevereiro 2026"},{"id":1092,"proj":"pemax","type":"out","amount":83.88,"desc":"SOUNDCLOUD ANUAL PEMAX","cat":"SUBSCRIPTION","date":"2026-02-27","month":"fevereiro 2026"},{"id":1101,"proj":"pemax","type":"in","amount":400.0,"desc":"04. DJING CLASS - SPOT 1 ANDREA","cat":"PEMAX","date":"2026-02-27","month":"fevereiro 2026"},{"id":1102,"proj":"personal","type":"out","amount":21.92,"desc":"FOOD","cat":"LIDLS","date":"2026-02-27","month":"fevereiro 2026"},{"id":1251,"proj":"pemax","type":"in","amount":150.0,"desc":"04. DJING CLASS - SPOT 2 IZIDRO 2 LESSONS","cat":"PEMAX","date":"2026-03-02","month":"março 2026"},{"id":1252,"proj":"personal","type":"out","amount":20.0,"desc":"FOOD","cat":"COFFEE","date":"2026-03-01","month":"março 2026"},{"id":1261,"proj":"pemax","type":"in","amount":300.0,"desc":"04. DJING CLASS - JAMES = 4 lessons","cat":"PEMAX","date":"2026-03-02","month":"março 2026"},{"id":1262,"proj":"personal","type":"out","amount":12.9,"desc":"FOOD","cat":"CIRCLE K","date":"2026-03-01","month":"março 2026"},{"id":1271,"proj":"sots","type":"out","amount":50.0,"desc":"SUPPORT ADS SOTS","cat":"PESSOAL","date":"2026-02-03","month":"março 2026"},{"id":1272,"proj":"personal","type":"out","amount":65.0,"desc":"FOOD","cat":"LIDL","date":"2026-03-02","month":"março 2026"},{"id":1281,"proj":"pemax","type":"in","amount":150.0,"desc":"04. DJING CLASS - LÉO 10 LESSONS 3/3","cat":"PEMAX","date":"2026-03-05","month":"março 2026"},{"id":1282,"proj":"personal","type":"out","amount":117.0,"desc":"IPAD 13TH M4 - WEEK 9/16","cat":"APPLE - PHONENEXT","date":"2026-03-02","month":"março 2026"},{"id":1291,"proj":"pemax","type":"in","amount":250.0,"desc":"04. DJING CLASS - j3llo 4 CLASS","cat":"PEMAX","date":"2026-03-05","month":"março 2026"},{"id":1292,"proj":"pp","type":"out","amount":48.0,"desc":"ADS INSTAGRAM","cat":"META","date":"2026-03-02","month":"março 2026"},{"id":1301,"proj":"pemax","type":"in","amount":250.0,"desc":"04. DJING CLASS - harshit 4 CLASS","cat":"PEMAX","date":"2026-03-06","month":"março 2026"},{"id":1302,"proj":"pp","type":"out","amount":10.0,"desc":"GOOGLE ADS","cat":"ADS","date":"2026-02-27","month":"março 2026"},{"id":1312,"proj":"personal","type":"out","amount":8.35,"desc":"GOOGLE ONE","cat":"SUBSCRIPTION","date":"2026-02-27","month":"março 2026"},{"id":1321,"proj":"personal","type":"out","amount":50.0,"desc":"FOOD","cat":"ANTONIO LICASTRO","date":"2026-03-09","month":"março 2026"},{"id":1322,"proj":"personal","type":"out","amount":13.7,"desc":"FOOD","cat":"MELO","date":"2026-03-02","month":"março 2026"},{"id":1332,"proj":"personal","type":"out","amount":16.95,"desc":"FOOD","cat":"CIRCLE K","date":"2026-03-05","month":"março 2026"},{"id":1342,"proj":"personal","type":"out","amount":550.0,"desc":"RENT HOUSE + 550 + 250 VI","cat":"DUBLIN RENT","date":"2026-03-05","month":"março 2026"},{"id":1352,"proj":"personal","type":"out","amount":250.0,"desc":"RENT HOUSE - VI","cat":"DUBLIN RENT","date":"2026-03-05","month":"março 2026"},{"id":1362,"proj":"personal","type":"out","amount":70.0,"desc":"FOOD","cat":"LIDL","date":"2026-03-05","month":"março 2026"},{"id":1372,"proj":"pp","type":"out","amount":10.0,"desc":"GOOGLE ADS","cat":"ADS","date":"2026-03-06","month":"março 2026"},{"id":1382,"proj":"pp","type":"out","amount":26.0,"desc":"ADS INSTAGRAM","cat":"ADS","date":"2026-03-07","month":"março 2026"},{"id":1391,"proj":"pemax","type":"in","amount":150.0,"desc":"KUKI CACHÊ","cat":"PEMAX","date":"2026-03-16","month":"março 2026"},{"id":1392,"proj":"personal","type":"out","amount":134.0,"desc":"IPAD 13TH M4 - WEEK 10/16","cat":"APPLE - PHONENEXT","date":"2026-03-07","month":"março 2026"},{"id":1401,"proj":"pp","type":"in","amount":600.0,"desc":"GIO - FASE 2","cat":"MANAGEMENT","date":"2026-03-20","month":"março 2026"},{"id":1402,"proj":"personal","type":"out","amount":5.0,"desc":"TFI","cat":"LEAP CARD","date":"2026-03-08","month":"março 2026"},{"id":1412,"proj":"personal","type":"out","amount":27.0,"desc":"CENTRO","cat":"FOOD / DRINK","date":"2026-03-05","month":"março 2026"},{"id":1422,"proj":"pp","type":"out","amount":4.0,"desc":"ADS INSTAGRAM","cat":"ADS","date":"2026-03-08","month":"março 2026"},{"id":1432,"proj":"personal","type":"out","amount":5.0,"desc":"TFI","cat":"LEAP CARD","date":"2026-03-08","month":"março 2026"},{"id":1442,"proj":"personal","type":"out","amount":17.0,"desc":"CENTRO","cat":"FOOD / DRINK","date":"2026-03-08","month":"março 2026"},{"id":1452,"proj":"personal","type":"out","amount":50.0,"desc":"Starlink Internet","cat":"SUBSCRIPTION","date":"2026-03-08","month":"março 2026"},{"id":1462,"proj":"personal","type":"out","amount":21.0,"desc":"PESSOAL","cat":"BOOTS","date":"2026-03-11","month":"março 2026"},{"id":1472,"proj":"personal","type":"out","amount":5.0,"desc":"TFI","cat":"LEAP CARD","date":"2026-03-11","month":"março 2026"},{"id":1482,"proj":"personal","type":"out","amount":33.0,"desc":"GASTOS + TONI","cat":"PESSOAL","date":"2026-03-12","month":"março 2026"},{"id":1492,"proj":"personal","type":"out","amount":10.0,"desc":"TRANSPORT","cat":"TFI","date":"2026-03-12","month":"março 2026"},{"id":1502,"proj":"personal","type":"out","amount":29.0,"desc":"PENNYS","cat":"PESSOAL","date":"2026-03-16","month":"março 2026"},{"id":1512,"proj":"personal","type":"out","amount":43.0,"desc":"ST PATRICKS","cat":"FOOD / DRINK","date":"2026-03-17","month":"março 2026"},{"id":1522,"proj":"personal","type":"out","amount":25.0,"desc":"TESCO","cat":"FOOD / DRINK","date":"2026-03-18","month":"março 2026"},{"id":1532,"proj":"personal","type":"out","amount":150.0,"desc":"HASH + PHOTOS","cat":"VITORIA","date":"2026-03-18","month":"março 2026"},{"id":1542,"proj":"pp","type":"out","amount":31.32,"desc":"ADS INSTAGRAM","cat":"META","date":"2026-03-19","month":"março 2026"},{"id":1552,"proj":"pp","type":"out","amount":35.1,"desc":"ADS INSTAGRAM","cat":"META","date":"2026-03-20","month":"março 2026"},{"id":1562,"proj":"personal","type":"out","amount":100.0,"desc":"CONTAS CASA ANTIGA (DEZ / JAN)","cat":"LUIS","date":"2026-03-20","month":"março 2026"},{"id":1572,"proj":"personal","type":"out","amount":50.0,"desc":"MEDICATION 5G","cat":"GIO","date":"2026-03-20","month":"março 2026"},{"id":1592,"proj":"personal","type":"out","amount":65.0,"desc":"HP 2800E + MINI CAMERA","cat":"PRINTER","date":"2026-03-19","month":"março 2026"},{"id":1602,"proj":"personal","type":"out","amount":117.0,"desc":"IPAD 13TH M4 - WEEK 11/16","cat":"APPLE - PHONENEXT","date":"2026-03-23","month":"março 2026"},{"id":1611,"proj":"sots","type":"in","amount":145.0,"desc":"INVESTIMENTO CASHBACK","cat":"SOTS","date":"2026-03-25","month":"março 2026"},{"id":1612,"proj":"personal","type":"out","amount":117.0,"desc":"IPAD 13TH M4 - WEEK 12/16","cat":"APPLE - PHONENEXT","date":"2026-03-23","month":"março 2026"},{"id":1621,"proj":"pp","type":"out","amount":300.0,"desc":"G4M 2 Channel Rotary DJ Mixer","cat":"INVESTIMENT","date":"2026-03-25","month":"março 2026"},{"id":1632,"proj":"personal","type":"out","amount":50.0,"desc":"COMIDAS","cat":"FOOD / DRINK","date":"2026-03-24","month":"março 2026"},{"id":1642,"proj":"personal","type":"out","amount":13.85,"desc":"2/3","cat":"TEMU","date":"2026-03-26","month":"março 2026"},{"id":1652,"proj":"personal","type":"out","amount":72.0,"desc":"BILLS HOUSE","cat":"DUBLIN RENT","date":"2026-03-26","month":"março 2026"},{"id":1662,"proj":"personal","type":"out","amount":399.0,"desc":"MPC SAMPLE","cat":"AKAI","date":"2026-03-26","month":"março 2026"},{"id":1672,"proj":"sots","type":"out","amount":5.0,"desc":"SOUNDCLOUND SOTS","cat":"SUBSCRIPTION","date":"2026-03-26","month":"março 2026"},{"id":1692,"proj":"personal","type":"out","amount":67.0,"desc":"DELIVEROO ADEDARE CIRCLE K","cat":"FOOD / DRINK","date":"2026-03-27","month":"março 2026"},{"id":1702,"proj":"personal","type":"out","amount":6.3,"desc":"CENTRA","cat":"FOOD / DRINK","date":"2026-03-29","month":"março 2026"},{"id":1712,"proj":"personal","type":"out","amount":93.27,"desc":"LIDL","cat":"FOOD / DRINK","date":"2026-03-30","month":"março 2026"},{"id":1831,"proj":"pemax","type":"in","amount":200.0,"desc":"IZAKAIA CACHE PEMAX","cat":"PEMAX","date":"2026-04-01","month":"abril 2026"},{"id":1832,"proj":"sots","type":"out","amount":2.0,"desc":"GOOGLE SOTS","cat":"SUBSCRIPTION","date":"2026-04-01","month":"abril 2026"},{"id":1842,"proj":"personal","type":"out","amount":50.0,"desc":"MEDICATION 5G","cat":"ANTONIO","date":"2026-03-27","month":"abril 2026"},{"id":1852,"proj":"personal","type":"out","amount":350.0,"desc":"RENT HOUSE","cat":"DUBLIN RENT","date":"2026-04-09","month":"abril 2026"},{"id":1862,"proj":"personal","type":"out","amount":117.0,"desc":"IPAD 13TH M4 - WEEK 13/16","cat":"APPLE - PHONENEXT","date":"2026-04-08","month":"abril 2026"},{"id":1872,"proj":"personal","type":"out","amount":33.0,"desc":"LIDL","cat":"FOOD / DRINK","date":"2026-04-09","month":"abril 2026"},{"id":1882,"proj":"personal","type":"out","amount":117.0,"desc":"IPAD 13TH M4 - WEEK 14/16","cat":"APPLE - PHONENEXT","date":"2026-04-11","month":"abril 2026"},{"id":1892,"proj":"personal","type":"out","amount":28.0,"desc":"PARTY + FOOD","cat":"FOOD / DRINK","date":"2026-04-11","month":"abril 2026"},{"id":1902,"proj":"pp","type":"out","amount":60.0,"desc":"ADS INSTAGRAM","cat":"META","date":"2026-04-11","month":"abril 2026"},{"id":1912,"proj":"personal","type":"out","amount":61.0,"desc":"PARTY + FOOD","cat":"FOOD / DRINK","date":"2026-04-12","month":"abril 2026"},{"id":1921,"proj":"pemax","type":"in","amount":200.0,"desc":"SOUNDMATE CACHE PEMAX","cat":"PEMAX","date":"2026-04-09","month":"abril 2026"},{"id":1922,"proj":"personal","type":"out","amount":5.0,"desc":"CIRCLE K","cat":"FOOD / DRINK","date":"2026-04-12","month":"abril 2026"},{"id":1931,"proj":"pemax","type":"in","amount":125.0,"desc":"004. DJING CLASS - APRIL CAMPAING 1 ALINE 1/2","cat":"PEMAX","date":"2026-04-01","month":"abril 2026"},{"id":1932,"proj":"pp","type":"out","amount":8.61,"desc":"GOOGLE DRIVE - POMADEX PRODUTIONS","cat":"SUBSCRIPTION","date":"2026-02-27","month":"abril 2026"},{"id":1941,"proj":"pemax","type":"in","amount":200.0,"desc":"004. DJING CLASS - APRIL CAMPAING 2 ANTONIO RENEW","cat":"PEMAX","date":"2026-04-09","month":"abril 2026"},{"id":1942,"proj":"sots","type":"out","amount":8.89,"desc":"SOUNDCLOUD SOTS REOCORDINGS","cat":"SUBSCRIPTION","date":"2026-02-27","month":"abril 2026"},{"id":1951,"proj":"pemax","type":"in","amount":250.0,"desc":"004. DJING CLASS - APRIL CAMPAING 3- STEPHANY","cat":"PEMAX","date":"2026-04-09","month":"abril 2026"},{"id":1972,"proj":"personal","type":"out","amount":117.0,"desc":"IPAD 13TH M4 - WEEK 15/16","cat":"APPLE - PHONENEXT","date":"2026-04-17","month":"abril 2026"},{"id":1981,"proj":"pemax","type":"in","amount":200.0,"desc":"004. DJING CLASS - APRIL CAMPAING 4 SEAN 1/2","cat":"PEMAX","date":"2026-04-11","month":"abril 2026"},{"id":1982,"proj":"personal","type":"out","amount":117.0,"desc":"IPAD 13TH M4 - WEEK 16/16","cat":"APPLE - PHONENEXT","date":"2026-04-17","month":"abril 2026"},{"id":1991,"proj":"pemax","type":"in","amount":150.0,"desc":"004. DJING CLASS - APRIL CAMPAING 5 MARIANA 1/2","cat":"PEMAX","date":"2026-04-11","month":"abril 2026"},{"id":1992,"proj":"personal","type":"out","amount":50.0,"desc":"STARLINK","cat":"STARLINK","date":"2026-04-17","month":"abril 2026"},{"id":2002,"proj":"personal","type":"out","amount":250.0,"desc":"EMPRESTIMO ALUGUEL + MEDICATION","cat":"VITORIA","date":"2026-04-17","month":"abril 2026"},{"id":2022,"proj":"personal","type":"out","amount":50.0,"desc":"MEDICATION","cat":"ARTHUR","date":"2026-04-18","month":"abril 2026"},{"id":2032,"proj":"personal","type":"out","amount":39.0,"desc":"OPIUM PARTY","cat":"FOOD / DRINK","date":"2026-04-18","month":"abril 2026"},{"id":2041,"proj":"pemax","type":"in","amount":100.0,"desc":"004. DJING CLASS - APRIL CAMPAING 6 - AISLING","cat":"PEMAX","date":"2026-04-16","month":"abril 2026"},{"id":2042,"proj":"personal","type":"out","amount":34.44,"desc":"SUNO","cat":"SUBSCRIPTION","date":"2026-04-23","month":"abril 2026"},{"id":2051,"proj":"pemax","type":"in","amount":125.0,"desc":"004. DJING CLASS - APRIL CAMPAING 1/5 - ALINE 2/2","cat":"PEMAX","date":"2026-04-17","month":"abril 2026"},{"id":2052,"proj":"personal","type":"out","amount":51.86,"desc":"LIDL","cat":"FOOD / DRINK","date":"2026-04-23","month":"abril 2026"},{"id":2061,"proj":"pemax","type":"in","amount":250.0,"desc":"004. DJING CLASS - APRIL CAMPAING 5 - MARIANA 2/2","cat":"PEMAX","date":"2026-04-17","month":"abril 2026"},{"id":2062,"proj":"personal","type":"out","amount":18.0,"desc":"BLOCK PARTY","cat":"FOOD / DRINK","date":"2026-04-23","month":"abril 2026"},{"id":2071,"proj":"pemax","type":"in","amount":150.0,"desc":"004. DJING CLASS - APRIL CAMPAING 4- SEAN 2/2","cat":"PEMAX","date":"2026-04-17","month":"abril 2026"},{"id":2072,"proj":"personal","type":"out","amount":13.85,"desc":"PAYMENT 1/3","cat":"TEMU","date":"2026-04-24","month":"abril 2026"},{"id":2082,"proj":"personal","type":"out","amount":9.5,"desc":"ADOBE","cat":"SUBSCRIPTION","date":"2026-04-27","month":"abril 2026"},{"id":2112,"proj":"personal","type":"out","amount":100.0,"desc":"EMPRESTIMOS","cat":"VITORIA","date":"2026-04-29","month":"abril 2026"},{"id":2121,"proj":"pp","type":"in","amount":126.22,"desc":"ARTWORK FLYER: SOTS X REAL TALKS","cat":"POMADEX PRODUCTIONS","date":"2026-04-23","month":"abril 2026"},{"id":2131,"proj":"pemax","type":"in","amount":100.0,"desc":"004. DJING CLASS - APRIL CAMPAING 6 - AISLING","cat":"PEMAX","date":"2026-04-30","month":"abril 2026"},{"id":2132,"proj":"personal","type":"out","amount":50.0,"desc":"STARLINK","cat":"STARLINK","date":"2026-04-30","month":"abril 2026"},{"id":2241,"proj":"pp","type":"in","amount":550.0,"desc":"ARTWORK FLYER::: 4 FLYERS DURING THE SUMMER","cat":"POMADEX PRODUCTIONS","date":"2026-04-29","month":"abril 2026"},{"id":2302,"proj":"personal","type":"out","amount":50.0,"desc":"INTERNET STARLINK","cat":"SUBSCRIPTION","date":"2026-06-01","month":"maio 2026"},{"id":2312,"proj":"personal","type":"out","amount":24.0,"desc":"CIRCLE K + LIDL","cat":"FOOD / DRINK","date":"2026-05-02","month":"maio 2026"},{"id":2322,"proj":"pp","type":"out","amount":9.0,"desc":"FACEBOOK ADS - DJ CLASSES","cat":"ADS","date":"2026-05-03","month":"maio 2026"},{"id":2332,"proj":"personal","type":"out","amount":75.0,"desc":"TRIP WEEDING JACK & CANDY","cat":"FOOD / DRINK","date":"2026-05-03","month":"maio 2026"},{"id":2392,"proj":"pp","type":"out","amount":8.0,"desc":"FACEBOOK ADS - DJ CLASSES","cat":"ADS","date":"2026-05-04","month":"maio 2026"},{"id":2402,"proj":"personal","type":"out","amount":38.0,"desc":"DELIVEROO","cat":"FOOD / DRINK","date":"2026-05-03","month":"maio 2026"},{"id":2411,"proj":"pp","type":"in","amount":300.0,"desc":"TONI GROVE - FASE 2 (-100 euros) 1/2","cat":"MANAGEMENT","date":"2026-05-08","month":"maio 2026"},{"id":2412,"proj":"personal","type":"out","amount":68.0,"desc":"ROLE COM FAMILIA VI","cat":"FOOD / DRINK","date":"2026-05-05","month":"maio 2026"},{"id":2421,"proj":"pemax","type":"in","amount":150.0,"desc":"03. DJING CLASS - IZIDRO +2 CLASSES","cat":"PEMAX","date":"2026-05-08","month":"maio 2026"},{"id":2422,"proj":"personal","type":"out","amount":30.0,"desc":"CIRCLE K + LIDL","cat":"FOOD / DRINK","date":"2026-05-06","month":"maio 2026"},{"id":2432,"proj":"pp","type":"in","amount":82.0,"desc":"GEAR4MUSIC - GRIND 1/3","cat":"EURO STUDIO 1.0","date":"2026-05-07","month":"maio 2026"},{"id":2442,"proj":"personal","type":"out","amount":30.0,"desc":"CIRCLE K + LIDL","cat":"FOOD / DRINK","date":"2026-05-07","month":"maio 2026"},{"id":2452,"proj":"personal","type":"out","amount":550.0,"desc":"RENT HOUSE","cat":"DUBLIN RENT","date":"2026-05-08","month":"maio 2026"},{"id":2462,"proj":"personal","type":"out","amount":25.0,"desc":"CIRCLE K + LIDL","cat":"FOOD / DRINK","date":"2026-05-08","month":"maio 2026"},{"id":2481,"proj":"personal","type":"out","amount":10.0,"desc":"INTERNET STARLINK - CLEITON","cat":"SUBSCRIPTION","date":"2026-05-11","month":"maio 2026"},{"id":2491,"proj":"personal","type":"out","amount":14.0,"desc":"VITORIA","cat":"$$$$$$","date":"2026-05-11","month":"maio 2026"},{"id":2501,"proj":"personal","type":"out","amount":10.0,"desc":"INTERNET STARLINK - TONI","cat":"SUBSCRIPTION","date":"2026-05-12","month":"maio 2026"},{"id":2562,"proj":"personal","type":"out","amount":25.0,"desc":"CIRCLE K + LIDL","cat":"FOOD / DRINK","date":"2026-05-18","month":"maio 2026"},{"id":2652,"proj":"pp","type":"out","amount":9.0,"desc":"DRIVE POMADEX PRODUCTIONS 8","cat":"SUBSCRIPTION","date":"2026-05-23","month":"maio 2026"},{"id":2661,"proj":"personal","type":"out","amount":14.0,"desc":"VITORIA","cat":"$$$$$$","date":"2026-05-22","month":"maio 2026"},{"id":2662,"proj":"pemax","type":"out","amount":3.0,"desc":"DRIVE PEMAX","cat":"SUBSCRIPTION","date":"2026-05-23","month":"maio 2026"},{"id":2742,"proj":"personal","type":"out","amount":150.0,"desc":"BILLS CONTAS LUIS","cat":"DUBLIN RENT","date":"2026-05-29","month":"maio 2026"},{"id":2752,"proj":"personal","type":"out","amount":150.0,"desc":"RENT HOUSE 1/2","cat":"DUBLIN RENT","date":"2026-05-29","month":"maio 2026"},{"id":2761,"proj":"pp","type":"in","amount":300.0,"desc":"TONI GROVE - FASE 2 (-50 euros) 2/2","cat":"MANAGEMENT","date":"2026-05-27","month":"maio 2026"},{"id":2771,"proj":"pemax","type":"in","amount":250.0,"desc":"RENEW 2 LESSONS TO FINISH - FABI","cat":"DJING CLASSES","date":"2026-05-29","month":"maio 2026"},{"id":2781,"proj":"pemax","type":"in","amount":150.0,"desc":"RENEW 2 LESSONS TO FINISH 10 LESSONS - HARSHIT","cat":"DJING CLASSES","date":"2026-05-29","month":"maio 2026"},{"id":2791,"proj":"pemax","type":"in","amount":150.0,"desc":"RENEW 2 LESSONS TO FINISH 10 LESSONS - J3LLO","cat":"DJING CLASSES","date":"2026-05-29","month":"maio 2026"},{"id":2802,"proj":"personal","type":"out","amount":400.0,"desc":"RENT HOUSE 2/2","cat":"DUBLIN RENT","date":"2026-05-29","month":"maio 2026"},{"id":2851,"proj":"pemax","type":"in","amount":20.0,"desc":"PEMAX - BANDCAMP","cat":"MUSIC ROYALTS","date":"2026-06-01","month":"JUNHO - 2026 (EURO SUMMER)"},{"id":2861,"proj":"sots","type":"in","amount":5.0,"desc":"SOUNDS OF THE STREETEZ RECORDS - BANDCAMP","cat":"MUSIC ROYALTS","date":"2026-06-01","month":"JUNHO - 2026 (EURO SUMMER)"},{"id":2981,"proj":"pp","type":"in","amount":150.0,"desc":"RENEW 2 LESSONS TO FINISH 10 LESSONS - GARBANZO","cat":"DJ LAB by Pomadex","date":"2026-06-12","month":"JUNHO - 2026 (EURO SUMMER)"},{"id":3132,"proj":"pp","type":"out","amount":20.0,"desc":"FIGMA","cat":"SUBSCRIPTION","date":"2026-05-27","month":"JUNHO - 2026 (EURO SUMMER)"},{"id":3142,"proj":"sots","type":"out","amount":8.0,"desc":"DRIVE SOTS 2","cat":"SUBSCRIPTION","date":"2026-05-28","month":"JUNHO - 2026 (EURO SUMMER)"},{"id":3152,"proj":"personal","type":"out","amount":15.0,"desc":"ADOBE","cat":"SUBSCRIPTION","date":"2026-05-28","month":"JUNHO - 2026 (EURO SUMMER)"},{"id":3162,"proj":"sots","type":"out","amount":11.0,"desc":"SOUNDCLOUD SOTS 10","cat":"SUBSCRIPTION","date":"2026-05-28","month":"JUNHO - 2026 (EURO SUMMER)"},{"id":3192,"proj":"personal","type":"out","amount":50.0,"desc":"INTERNET STARLINK","cat":"SUBSCRIPTION","date":"2026-06-01","month":"JUNHO - 2026 (EURO SUMMER)"},{"id":3251,"proj":"personal","type":"out","amount":10.0,"desc":"CLEITON","cat":"INTENERT","date":"2026-05-12","month":"JUNHO - 2026 (EURO SUMMER)"},{"id":3261,"proj":"personal","type":"out","amount":10.0,"desc":"GAB","cat":"INTENERT","date":"2026-05-12","month":"JUNHO - 2026 (EURO SUMMER)"},{"id":3271,"proj":"personal","type":"out","amount":10.0,"desc":"MILENA","cat":"INTENERT","date":"2026-05-12","month":"JUNHO - 2026 (EURO SUMMER)"},{"id":3272,"proj":"personal","type":"out","amount":25.0,"desc":"EMPRESTIMO","cat":"VITORIA","date":"2026-06-01","month":"JUNHO - 2026 (EURO SUMMER)"},{"id":3282,"proj":"pp","type":"in","amount":40.0,"desc":"AGULHA","cat":"CLEITON","date":"2026-06-01","month":"JUNHO - 2026 (EURO SUMMER)"},{"id":3292,"proj":"personal","type":"out","amount":15.0,"desc":"MEDICATION","cat":"GAB","date":"2026-06-01","month":"JUNHO - 2026 (EURO SUMMER)"},{"id":3302,"proj":"personal","type":"out","amount":35.0,"desc":"MEDICATION","cat":"LUIS","date":"2026-06-01","month":"JUNHO - 2026 (EURO SUMMER)"},{"id":3351,"proj":"pemax","type":"in","amount":125.0,"desc":"IZAKAIA BASEMENT X SOTS RECORDS - CACHE","cat":"PEMAX","date":"2026-06-27","month":"JUNHO - 2026 (EURO SUMMER)"},{"id":3502,"proj":"personal","type":"out","amount":550.0,"desc":"RENT HOUSE JULHO","cat":"DUBLIN RENT","date":"2026-07-01","month":"RENT HOUSE JULHO"},{"id":3512,"proj":"personal","type":"out","amount":100.0,"desc":"BILLS HOUSE","cat":"DUBLIN RENT","date":"2026-07-01","month":"RENT HOUSE JULHO"},{"id":3532,"proj":"pp","type":"in","amount":50.0,"desc":"GEAR4MUSIC - GRIND 2/3","cat":"EURO STUDIO 1.0","date":"2026-06-05","month":"RENT HOUSE JULHO"},{"id":3541,"proj":"pp","type":"in","amount":700.0,"desc":"TONI GROOVE FASE 3","cat":"MD.1.1 ARTISTIC CARRER MANAGEMENT by Pomadex","date":"2026-07-10","month":"RENT HOUSE JULHO"},{"id":3542,"proj":"pp","type":"in","amount":40.0,"desc":"GEAR4MUSIC - GRIND 3/3","cat":"EURO STUDIO 1.0","date":"2026-07-07","month":"RENT HOUSE JULHO"},{"id":3551,"proj":"pp","type":"in","amount":600.0,"desc":"G!O FASE 3","cat":"MD.1.1 ARTISTIC CARRER MANAGEMENT by Pomadex","date":"2026-07-10","month":"RENT HOUSE JULHO"},{"id":3562,"proj":"pp","type":"in","amount":100.0,"desc":"FACEBOOK ADS - DJ CLASSES","cat":"MD.2.1 DJ LAB by Pomadex","date":"2026-06-01","month":"RENT HOUSE JULHO"},{"id":3631,"proj":"pp","type":"in","amount":150.0,"desc":"MARIANA - UPGRADE + 2 LESSONS = 10 LESSONS","cat":"MD.2.1 DJ LAB by Pomadex","date":"2026-07-03","month":"RENT HOUSE JULHO"},{"id":3641,"proj":"pp","type":"in","amount":150.0,"desc":"ALINE - UPGRADE + 2 LESSONS = 10 LESSONS","cat":"MD.2.1 DJ LAB by Pomadex","date":"2026-07-03","month":"RENT HOUSE JULHO"},{"id":3642,"proj":"personal","type":"out","amount":220.0,"desc":"CONCORDE","cat":"NEEDLE","date":"2025-11-28","month":"RENT HOUSE JULHO"},{"id":3651,"proj":"pp","type":"in","amount":300.0,"desc":"ANDREA - UPGRADE + 4 LESSONS = 10 LESSONS","cat":"MD.2.1 DJ LAB by Pomadex","date":"2026-07-03","month":"RENT HOUSE JULHO"},{"id":3661,"proj":"pp","type":"in","amount":300.0,"desc":"JAMES - UPGRADE + 6 LESSONS = 10 LESSONS","cat":"MD.2.1 DJ LAB by Pomadex","date":"2026-07-03","month":"RENT HOUSE JULHO"},{"id":3662,"proj":"personal","type":"out","amount":700.0,"desc":"PASSAGEM PARA O BRASIL","cat":"BRASIL","date":"2026-07-16","month":"RENT HOUSE JULHO"},{"id":3671,"proj":"pp","type":"in","amount":300.0,"desc":"STEPHANIE - UPGRADE + 6 LESSONS = 10 LESSONS","cat":"MD.2.1 DJ LAB by Pomadex","date":"2026-07-03","month":"RENT HOUSE JULHO"},{"id":3681,"proj":"pp","type":"in","amount":300.0,"desc":"VICTOR - UPGRADE + 2 LESSONS = 4 LESSONS","cat":"MD.2.1 DJ LAB by Pomadex","date":"2026-07-03","month":"RENT HOUSE JULHO"},{"id":3712,"proj":"personal","type":"out","amount":2000.0,"desc":"SSL BIG SIX","cat":"AUDIO INTERFACE","date":"2026-07-10","month":"RENT HOUSE JULHO"},{"id":3721,"proj":"pp","type":"in","amount":350.0,"desc":"NEW STUDENT 1 - NEW CAMPAING **** FEDE","cat":"MD.2.1 DJ LAB by Pomadex","date":"2026-07-03","month":"RENT HOUSE JULHO"},{"id":3722,"proj":"personal","type":"out","amount":1300.0,"desc":"GENELEC 8030","cat":"SPEAKERS","date":"2026-07-10","month":"RENT HOUSE JULHO"},{"id":3731,"proj":"pp","type":"in","amount":350.0,"desc":"NEW STUDENT 2 - NEW CAMPAING ***BRUNA","cat":"MD.2.1 DJ LAB by Pomadex","date":"2026-07-03","month":"RENT HOUSE JULHO"},{"id":3732,"proj":"personal","type":"out","amount":150.0,"desc":"VARIOS TIPOS DE CABOS - OYADES + MESA DE SOM","cat":"CABLES 1","date":"2026-07-10","month":"RENT HOUSE JULHO"},{"id":3741,"proj":"pp","type":"in","amount":250.0,"desc":"NEW STUDENT 3 - NEW CAMPAING","cat":"MD.2.1 DJ LAB by Pomadex","date":"2026-07-03","month":"RENT HOUSE JULHO"},{"id":3742,"proj":"personal","type":"out","amount":30.0,"desc":"CARTÃO MICRO SD PARA MPC","cat":"AMAZON","date":"2026-06-05","month":"RENT HOUSE JULHO"},{"id":3751,"proj":"pp","type":"in","amount":250.0,"desc":"NEW STUDENT 4 - NEW CAMPAING","cat":"MD.2.1 DJ LAB by Pomadex","date":"2026-07-03","month":"RENT HOUSE JULHO"},{"id":3761,"proj":"pp","type":"in","amount":600.0,"desc":"NEW STUDENT 5 - NEW CAMPAING","cat":"MD.2.1 DJ LAB by Pomadex","date":"2026-07-03","month":"RENT HOUSE JULHO"},{"id":3772,"proj":"personal","type":"out","amount":70.0,"desc":"CUECAS + SAMBA","cat":"SHOOPING","date":"2026-06-12","month":"RENT HOUSE JULHO"},{"id":3781,"proj":"pp","type":"in","amount":500.0,"desc":"DJ 1 - NEW CAMPAING -> START IN JUL / AUG","cat":"MD.2.2 DJ EURO MANAGEMENT by Pomadex","date":"2026-07-10","month":"RENT HOUSE JULHO"},{"id":3791,"proj":"pp","type":"in","amount":500.0,"desc":"DJ 2 - NEW CAMPAING -> START IN JUL / AUG","cat":"MD.2.2 DJ EURO MANAGEMENT by Pomadex","date":"2026-07-10","month":"RENT HOUSE JULHO"},{"id":3792,"proj":"personal","type":"out","amount":120.0,"desc":"ALL STAR CHUCK TAYLOR - NEW SHOES","cat":"CONVERSE","date":"2026-06-12","month":"RENT HOUSE JULHO"},{"id":3801,"proj":"pp","type":"in","amount":500.0,"desc":"DJ 3 - NEW CAMPAING -> START IN JUL / AUG","cat":"MD.2.2 DJ EURO MANAGEMENT by Pomadex","date":"2026-07-10","month":"RENT HOUSE JULHO"},{"id":3802,"proj":"personal","type":"out","amount":120.0,"desc":"SAPATO DE COURO","cat":"TOMMY","date":"2026-06-12","month":"RENT HOUSE JULHO"},{"id":3811,"proj":"pp","type":"in","amount":500.0,"desc":"DJ 4 - NEW CAMPAING -> START IN JUL / AUG","cat":"MD.2.2 DJ EURO MANAGEMENT by Pomadex","date":"2026-07-10","month":"RENT HOUSE JULHO"},{"id":3821,"proj":"pp","type":"in","amount":500.0,"desc":"DJ 5 - NEW CAMPAING -> START IN JUL / AUG","cat":"MD.2.2 DJ EURO MANAGEMENT by Pomadex","date":"2026-07-10","month":"RENT HOUSE JULHO"},{"id":3822,"proj":"personal","type":"out","amount":300.0,"desc":"CALÇA + BERMUDA","cat":"URBAN OUTFITTERS","date":"2026-06-12","month":"RENT HOUSE JULHO"},{"id":3832,"proj":"personal","type":"out","amount":200.0,"desc":"CAMISETAS DIFERENTES","cat":"URBAN OUTFITTERS","date":"2026-06-12","month":"RENT HOUSE JULHO"},{"id":3842,"proj":"personal","type":"out","amount":200.0,"desc":"CAMISETAS BASICAS LEVIS + P/B","cat":"URBAN OUTFITTERS","date":"2026-06-12","month":"RENT HOUSE JULHO"},{"id":3851,"proj":"pp","type":"in","amount":500.0,"desc":"ARTIST 1 - NEW CAMPAING -> START IN JUL / AUG","cat":"MD.1.2 ARTISTIC MANAGEMENT (3-months) by Pomadex","date":"2026-07-24","month":"RENT HOUSE JULHO"},{"id":3861,"proj":"pp","type":"in","amount":500.0,"desc":"ARTIST 2 - NEW CAMPAING -> START IN JUL / AUG","cat":"MD.1.2 ARTISTIC MANAGEMENT (3-months) by Pomadex","date":"2026-07-24","month":"RENT HOUSE JULHO"},{"id":3862,"proj":"personal","type":"out","amount":50.0,"desc":"FAZER UM CORTE STYLE","cat":"CORTE DE CABELO","date":"2026-06-12","month":"RENT HOUSE JULHO"},{"id":3871,"proj":"pp","type":"in","amount":500.0,"desc":"ARTIST 3 - NEW CAMPAING -> START IN JUL / AUG","cat":"MD.1.2 ARTISTIC MANAGEMENT (3-months) by Pomadex","date":"2026-07-24","month":"RENT HOUSE JULHO"},{"id":3881,"proj":"pp","type":"in","amount":500.0,"desc":"ARTIST 4 - NEW CAMPAING -> START IN JUL / AUG","cat":"MD.1.2 ARTISTIC MANAGEMENT (3-months) by Pomadex","date":"2026-07-24","month":"RENT HOUSE JULHO"},{"id":3882,"proj":"personal","type":"out","amount":90.0,"desc":"PRESENTE","cat":"VITORIA","date":"2026-06-12","month":"RENT HOUSE JULHO"},{"id":3891,"proj":"pp","type":"in","amount":500.0,"desc":"ARTIST 5 - NEW CAMPAING -> START IN JUL / AUG","cat":"MD.1.2 ARTISTIC MANAGEMENT (3-months) by Pomadex","date":"2026-07-24","month":"RENT HOUSE JULHO"},{"id":3922,"proj":"personal","type":"out","amount":300.0,"desc":"EMPRESTIMO R$2.000","cat":"THE KUHLS","date":"2026-06-05","month":"EXPECTATIVA JULHO"},{"id":3932,"proj":"pemax","type":"in","amount":150.0,"desc":"TAX IMPLOEYD + aplicar para receber dos alugueis","cat":"PEMAX","date":"2026-06-05","month":"EXPECTATIVA JULHO"},{"id":3942,"proj":"personal","type":"out","amount":200.0,"desc":"Update + Declaração 2026","cat":"MEI","date":"2026-01-09","month":"EXPECTATIVA JULHO"},{"id":4022,"proj":"personal","type":"out","amount":200.0,"desc":"CARTÃO CRED. JANDIRA (JANEIRO) 8/36 R$600","cat":"CARTÃO","date":"2026-02-20","month":"EXPECTATIVA JULHO"},{"id":4091,"proj":"pemax","type":"in","amount":300.0,"desc":"NEW STUDENT 6 - TO START IN JULY / AGOSTO","cat":"DJING CLASSES","date":"2026-06-19","month":"EXPECTATIVA JULHO"},{"id":4092,"proj":"personal","type":"out","amount":90.0,"desc":"NEGOCIATION 4.500 1/9","cat":"VITAL ÓCULOS","date":"2026-06-05","month":"EXPECTATIVA JULHO"},{"id":4101,"proj":"pemax","type":"in","amount":300.0,"desc":"NEW STUDENT 7 - TO START IN JULY / AGOSTO","cat":"DJING CLASSES","date":"2026-06-19","month":"EXPECTATIVA JULHO"},{"id":4102,"proj":"personal","type":"out","amount":90.0,"desc":"NEGOCIATION 4.500 2/9","cat":"VITAL ÓCULOS","date":"2026-06-12","month":"EXPECTATIVA JULHO"},{"id":4111,"proj":"pemax","type":"in","amount":300.0,"desc":"NEW STUDENT 8 - TO START IN JULY / AGOSTO","cat":"DJING CLASSES","date":"2026-06-19","month":"EXPECTATIVA JULHO"},{"id":4112,"proj":"personal","type":"out","amount":90.0,"desc":"NEGOCIATION 4.500 3/9","cat":"VITAL ÓCULOS","date":"2026-06-12","month":"EXPECTATIVA JULHO"},{"id":4121,"proj":"pemax","type":"in","amount":300.0,"desc":"NEW STUDENT 9 - TO START IN JULY / AGOSTO","cat":"DJING CLASSES","date":"2026-06-19","month":"EXPECTATIVA JULHO"},{"id":4122,"proj":"personal","type":"out","amount":90.0,"desc":"NEGOCIATION 4.500 4/9","cat":"VITAL ÓCULOS","date":"2026-06-19","month":"EXPECTATIVA JULHO"},{"id":4131,"proj":"pemax","type":"in","amount":300.0,"desc":"NEW STUDENT 10 - TO START IN JULY / AGOSTO","cat":"DJING CLASSES","date":"2026-06-19","month":"EXPECTATIVA JULHO"},{"id":4132,"proj":"personal","type":"out","amount":90.0,"desc":"NEGOCIATION 4.500 5/9","cat":"VITAL ÓCULOS","date":"2026-06-19","month":"EXPECTATIVA JULHO"},{"id":4141,"proj":"pp","type":"in","amount":600.0,"desc":"ARTIST 6 - TO START IN AGOSTO","cat":"DJ MANAGEMENT","date":"2026-06-26","month":"ARTIST 6 - TO START IN AGOSTO"},{"id":4142,"proj":"personal","type":"out","amount":90.0,"desc":"NEGOCIATION 4.500 6/9","cat":"VITAL ÓCULOS","date":"2026-06-05","month":"ARTIST 6 - TO START IN AGOSTO"},{"id":4151,"proj":"pp","type":"in","amount":600.0,"desc":"ARTIST 7 - TO START IN AGOSTO","cat":"DJ MANAGEMENT","date":"2026-06-26","month":"ARTIST 7 - TO START IN AGOSTO"},{"id":4152,"proj":"personal","type":"out","amount":90.0,"desc":"NEGOCIATION 4.500 7/9","cat":"VITAL ÓCULOS","date":"2026-06-12","month":"ARTIST 7 - TO START IN AGOSTO"},{"id":4161,"proj":"pp","type":"in","amount":600.0,"desc":"ARTIST 8 - TO START IN AGOSTO","cat":"DJ MANAGEMENT","date":"2026-06-26","month":"ARTIST 8 - TO START IN AGOSTO"},{"id":4162,"proj":"personal","type":"out","amount":90.0,"desc":"NEGOCIATION 4.500 8/9","cat":"VITAL ÓCULOS","date":"2026-06-19","month":"ARTIST 8 - TO START IN AGOSTO"},{"id":4171,"proj":"pp","type":"in","amount":600.0,"desc":"ARTIST 9 - TO START IN AGOSTO","cat":"DJ MANAGEMENT","date":"2026-06-26","month":"ARTIST 9 - TO START IN AGOSTO"},{"id":4172,"proj":"personal","type":"out","amount":90.0,"desc":"NEGOCIATION 4.500 9/9","cat":"VITAL ÓCULOS","date":"2026-06-26","month":"ARTIST 9 - TO START IN AGOSTO"},{"id":4181,"proj":"pp","type":"in","amount":600.0,"desc":"ARTIST 10 - TO START IN AGOSTO","cat":"DJ MANAGEMENT","date":"2026-06-26","month":"ARTIST 9 - TO START IN AGOSTO"}];
+
+const PROJS = {
+  pedro:{ name:'Pedro Maximo', short:'PEDRO', color:'#ff6b35', emoji:'👤' },
+  pp:   { name:'Pomadex Productions', short:'PP', color:'#f5c842', emoji:'🎛' },
+  sots: { name:'S.O.T.S. Recordings', short:'SOTS', color:'#40c4ff', emoji:'🎵' },
+  snare:{ name:'Clube do Snare Records', short:'SNARE', color:'#00d4aa', emoji:'🥁' },
+  pemax:{ name:'PEMAX', short:'PEMAX', color:'#c56cf0', emoji:'🎤' }
+};
+const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const CATS = {
+  pedro:['Salário','Transferência','Rendimento','Outro'],
+  pp:   ['Produção Musical','Management','Mixing/Mastering','Ilustração/Design','Marketing/ADS','Equipamento','Plataformas','Workshops','Outro'],
+  sots: ['Management','Creative Direction','Distribuição','Events & Shows','Marketing/ADS','Rádio','Merchandising','Outro'],
+  snare:['Assinaturas','Eventos','Workshops','Merchandise','Plataformas','Patrocínio','Outro'],
+  pemax:['DJ Classes','Music Classes','Caches/Shows','Music Royalties','Merchandising','Marketing/ADS','Outro']
+};
+const CURRENCIES = { EUR:'€', USD:'$', BRL:'R$' };
+const RATES = { EUR:1, USD:1.08, BRL:5.5 };
+
+// ── STATE ──────────────────────────────────────────────────────
+var apiUrl = localStorage.getItem('pmx_api_url') || '';
+var currency = localStorage.getItem('pmx_curr') || 'EUR';
+var tab = 'overview';
+var filterM = 'all';
+var txns = [];
+var forecasts = [];
+var pinEntry = '';
+var isOnline = false;
+var charts = {};
+
+// ── API ────────────────────────────────────────────────────────
+function setSyncStatus(state) {
+  var dot = document.getElementById('syncDot');
+  if (!dot) return;
+  dot.className = 'hdr-sync' + (state === 'syncing' ? ' syncing' : state === 'error' ? ' error' : '');
+}
+
+function api(action, data) {
+  if (!apiUrl) { return Promise.resolve({ ok: false, error: 'No API URL' }); }
+  setSyncStatus('syncing');
+  var body = Object.assign({ action: action }, data || {});
+  return fetch(apiUrl, {
+    method: 'POST', mode: 'no-cors',
+    body: JSON.stringify(body),
+    headers: { 'Content-Type': 'text/plain' }
+  }).then(function(r) {
+    // no-cors returns opaque response - we need to use redirect trick
+    return fetch(apiUrl + '?_=' + Date.now(), {
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
+  }).then(function(r) {
+    setSyncStatus('ok');
+    return r.json();
+  }).catch(function(e) {
+    setSyncStatus('error');
+    return { ok: false, error: e.toString() };
+  });
+}
+
+// CORS-safe fetch for Google Apps Script
+function apiCall(action, data) {
+  if (!apiUrl) return Promise.resolve({ ok: false, error: 'No API URL configured' });
+  setSyncStatus('syncing');
+  var params = Object.assign({ action: action }, data || {});
+  // GAS Web Apps support JSONP-style GET for read, POST for write
+  // Use no-cors POST + local cache strategy
+  return fetch(apiUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params)
+  }).then(function(r) {
+    setSyncStatus('ok');
+    return r.json();
+  }).catch(function() {
+    // Fallback: try as GET with params
+    var url = apiUrl + '?action=' + action + '&data=' + encodeURIComponent(JSON.stringify(params));
+    return fetch(url).then(function(r) { setSyncStatus('ok'); return r.json(); });
+  }).catch(function(e) {
+    setSyncStatus('error');
+    console.error('API error:', e);
+    return { ok: false, error: e.toString() };
+  });
+}
+
+// ── PIN ────────────────────────────────────────────────────────
+function initPin() {
+  document.getElementById('pinScreen').style.display = 'flex';
+  document.getElementById('mainApp').style.display = 'none';
+  updatePinDots();
+}
+
+function pressKey(k) {
+  if (pinEntry.length >= 4) return;
+  pinEntry += k;
+  updatePinDots();
+  if (pinEntry.length === 4) setTimeout(checkPin, 150);
+}
+
+function delKey() {
+  pinEntry = pinEntry.slice(0,-1);
+  updatePinDots();
+  document.getElementById('pinError').textContent = '';
+}
+
+function updatePinDots() {
+  for (var i=0; i<4; i++) {
+    var d = document.getElementById('pd' + i);
+    if (d) d.className = 'pin-dot' + (i < pinEntry.length ? ' filled' : '');
+  }
+}
+
+function checkPin() {
+  if (!apiUrl) {
+    // offline mode - use local pin
+    var localPin = localStorage.getItem('pmx_local_pin') || '1234';
+    if (pinEntry === localPin) { unlockApp(); }
+    else { showPinError(); }
+    return;
+  }
+  apiCall('verifyPin', { pin: pinEntry }).then(function(res) {
+    if (res.ok && res.verified) { unlockApp(); }
+    else { showPinError(); }
+  }).catch(function() {
+    // if API fails, allow offline with cached pin
+    var localPin = localStorage.getItem('pmx_local_pin') || '1234';
+    if (pinEntry === localPin) { unlockApp(); }
+    else { showPinError(); }
+  });
+}
+
+function showPinError() {
+  document.getElementById('pinError').textContent = 'PIN incorreto. Tenta novamente.';
+  pinEntry = '';
+  updatePinDots();
+  // shake animation
+  var dots = document.querySelector('.pin-dots');
+  dots.style.transform = 'translateX(8px)';
+  setTimeout(function(){ dots.style.transform = 'translateX(-8px)'; }, 100);
+  setTimeout(function(){ dots.style.transform = 'none'; }, 200);
+}
+
+function unlockApp() {
+  localStorage.setItem('pmx_local_pin', pinEntry);
+  document.getElementById('pinScreen').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'block';
+  loadAllData();
+}
+
+// ── DATA LOADING ───────────────────────────────────────────────
+function loadAllData() {
+  document.getElementById('app').innerHTML = '<div class="loading"><div class="spinner"></div>A carregar dados...</div>';
+  if (!apiUrl) {
+    // offline: use imported + localStorage
+    txns = JSON.parse(JSON.stringify(IMPORTED_DATA));
+    var saved = localStorage.getItem('pmx_txns_offline');
+    if (saved) txns = JSON.parse(saved);
+    forecasts = JSON.parse(localStorage.getItem('pmx_fc_offline') || '[]');
+    isOnline = false;
+    render();
+    return;
+  }
+  Promise.all([
+    apiCall('getTxns'),
+    apiCall('getForecasts')
+  ]).then(function(results) {
+    var txRes = results[0], fcRes = results[1];
+    if (txRes.ok && txRes.data && txRes.data.length > 0) {
+      txns = txRes.data.map(function(t) { return { id: t.id, proj: t.proj, type: t.type, amount: parseFloat(t.amount)||0, desc: t.desc, cat: t.cat, date: t.date }; });
+      isOnline = true;
+    } else {
+      // First time / empty sheet: use imported data
+      txns = JSON.parse(JSON.stringify(IMPORTED_DATA));
+      isOnline = true;
+      // Offer to import
+      if (txRes.ok && txRes.data && txRes.data.length === 0) {
+        showImportPrompt();
+        return;
+      }
+    }
+    if (fcRes.ok) forecasts = (fcRes.data || []).map(function(f) { return { id: f.id, proj: f.proj, type: f.type, amount: parseFloat(f.amount)||0, desc: f.desc, month: parseInt(f.month), year: parseInt(f.year) }; });
+    render();
+  }).catch(function(e) {
+    console.error(e);
+    txns = JSON.parse(JSON.stringify(IMPORTED_DATA));
+    forecasts = [];
+    isOnline = false;
+    render();
+  });
+}
+
+function showImportPrompt() {
+  document.getElementById('app').innerHTML =
+    '<div style="text-align:center;padding:60px 20px;">' +
+    '<div style="font-size:32px;margin-bottom:12px">📥</div>' +
+    '<div style="font-size:16px;font-weight:800;color:var(--gold);margin-bottom:8px">Google Sheets está vazio!</div>' +
+    '<div style="font-size:13px;color:var(--muted2);margin-bottom:24px">Queres importar os 294 registos da planilha anterior?</div>' +
+    '<button onclick="doImport()" style="background:var(--gold);color:#000;border:none;padding:14px 28px;border-radius:10px;font-size:14px;font-weight:900;cursor:pointer;margin-right:10px">Sim, importar dados</button>' +
+    '<button onclick="startFresh()" style="background:var(--card);color:var(--muted2);border:1px solid var(--border2);padding:14px 28px;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer">Começar do zero</button>' +
+    '</div>';
+}
+
+function doImport() {
+  document.getElementById('app').innerHTML = '<div class="loading"><div class="spinner"></div>A importar ' + IMPORTED_DATA.length + ' registos...</div>';
+  apiCall('importBulk', { txns: IMPORTED_DATA }).then(function(res) {
+    if (res.ok) { loadAllData(); }
+    else { document.getElementById('app').innerHTML = '<div class="loading">Erro: ' + (res.error||'unknown') + '</div>'; }
+  });
+}
+
+function startFresh() { txns = []; forecasts = []; render(); }
+
+// ── UTILS ──────────────────────────────────────────────────────
+function yr() { return parseInt(document.getElementById('yearSel').value); }
+function sym() { return CURRENCIES[currency]; }
+function conv(eur) { return eur * (RATES[currency]); }
+function fmtN(eur) {
+  var n = conv(eur), abs = Math.abs(n), sign = n < 0 ? '-' : '';
+  if (abs >= 1000) return sign + sym() + (abs/1000).toFixed(1) + 'k';
+  return sign + sym() + Math.round(abs);
+}
+function fmtF(eur) {
+  var n = conv(eur), abs = Math.abs(n), sign = n < 0 ? '-' : '';
+  return sign + sym() + abs.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+function getTxns(proj, y) {
+  return txns.filter(function(t) { return (!proj||t.proj===proj) && (!y||new Date(t.date).getFullYear()===y); });
+}
+function getFc(proj, y) {
+  return forecasts.filter(function(f) { return (!proj||f.proj===proj) && (!y||f.year===y); });
+}
+function stats(list) {
+  var i=0, o=0;
+  list.forEach(function(t){ t.type==='in' ? i+=t.amount : o+=t.amount; });
+  return { income:i, expense:o, balance:i-o };
+}
+function fcStats(list) {
+  var i=0, o=0;
+  list.forEach(function(f){ f.type==='in' ? i+=f.amount : o+=f.amount; });
+  return { income:i, expense:o };
+}
+function monthlyData(proj, y) {
+  var d=[]; for(var i=0;i<12;i++) d.push({in:0,out:0});
+  getTxns(proj,y).forEach(function(t){ var m=new Date(t.date).getMonth(); d[m][t.type]+=t.amount; });
+  return d;
+}
+
+// ── ACTIONS ────────────────────────────────────────────────────
+function go(t) {
+  tab=t; filterM='all';
+  document.querySelectorAll('.nb').forEach(function(b){ b.classList.toggle('active',b.dataset.p===t); });
+  render();
+}
+function setM(m) { filterM=m; render(); }
+function changeCurrency(c) { currency=c; localStorage.setItem('pmx_curr',c); render(); }
+
+function addTx(type) {
+  var proj=document.getElementById('fProj').value;
+  var amtD=parseFloat(document.getElementById('fAmt').value);
+  var desc=document.getElementById('fDesc').value.trim();
+  var date=document.getElementById('fDate').value;
+  var cat=document.getElementById('fCat').value;
+  if(!proj||!amtD||!desc||!date){ alert('Preenche todos os campos!'); return; }
+  var amtEur = currency==='EUR' ? amtD : amtD/RATES[currency];
+  var txn = { proj:proj, type:type, amount:amtEur, desc:desc, cat:cat, date:date };
+  document.getElementById('fAmt').value='';
+  document.getElementById('fDesc').value='';
+  if (isOnline) {
+    apiCall('addTxn', { txn:txn }).then(function(res){
+      if(res.ok){ txn.id=res.id; txns.push(txn); render(); }
+    });
+  } else {
+    txn.id = Date.now(); txns.push(txn);
+    localStorage.setItem('pmx_txns_offline', JSON.stringify(txns));
+    render();
+  }
+}
+
+function delTx(id) {
+  if(!confirm('Apagar esta transação?')) return;
+  txns = txns.filter(function(t){ return t.id.toString()!==id.toString(); });
+  render();
+  if(isOnline) apiCall('deleteTxn',{id:id});
+  else localStorage.setItem('pmx_txns_offline',JSON.stringify(txns));
+}
+
+function addFc(type, proj) {
+  var amtD=parseFloat(document.getElementById('fcAmt_'+type).value);
+  var desc=document.getElementById('fcDesc_'+type).value.trim();
+  var month=parseInt(document.getElementById('fcMonth_'+type).value);
+  var y=yr();
+  if(!amtD||!desc){ alert('Preenche valor e descrição!'); return; }
+  var amtEur = currency==='EUR' ? amtD : amtD/RATES[currency];
+  var fc = { proj:proj, type:type, amount:amtEur, desc:desc, month:month, year:y };
+  document.getElementById('fcAmt_'+type).value='';
+  document.getElementById('fcDesc_'+type).value='';
+  if(isOnline){
+    apiCall('addForecast',{forecast:fc}).then(function(res){
+      if(res.ok){ fc.id=res.id; forecasts.push(fc); render(); }
+    });
+  } else {
+    fc.id=Date.now(); forecasts.push(fc);
+    localStorage.setItem('pmx_fc_offline',JSON.stringify(forecasts));
+    render();
+  }
+}
+
+function delFc(id) {
+  forecasts = forecasts.filter(function(f){ return f.id.toString()!==id.toString(); });
+  render();
+  if(isOnline) apiCall('deleteForecast',{id:id});
+  else localStorage.setItem('pmx_fc_offline',JSON.stringify(forecasts));
+}
+
+// ── RENDER ──────────────────────────────────────────────────────
+function destroyCharts(){ Object.keys(charts).forEach(function(k){if(charts[k])charts[k].destroy();}); charts={}; }
+
+function render() {
+  destroyCharts();
+  var el=document.getElementById('app');
+  if(tab==='overview') el.innerHTML=renderOverview();
+  else el.innerHTML=renderProj(tab);
+  buildCharts();
+  document.getElementById('curSel').value=currency;
+}
+
+function renderOverview() {
+  var y=yr();
+  var allReal=getTxns(null,y).filter(function(t){return t.proj!=='personal';});
+  var s=stats(allReal), allFc=getFc(null,y), fcs=fcStats(allFc);
+  var onlineBadge = isOnline
+    ? '<span class="badge" style="background:rgba(0,230,118,.1);color:var(--green);border-color:rgba(0,230,118,.25)">🟢 Online — Google Sheets</span>'
+    : '<span class="badge" style="background:rgba(255,71,87,.1);color:var(--red);border-color:rgba(255,71,87,.25)">🔴 Offline — dados locais</span>';
+
+  var projCards=Object.keys(PROJS).map(function(key){
+    var p=PROJS[key], ps=stats(getTxns(key,y)), fcs2=fcStats(getFc(key,y));
+    var total=ps.income+ps.expense, pct=total>0?Math.round(ps.income/total*100):0;
+    var bc=ps.balance>=0?'var(--green)':'var(--red)';
+    return '<div class="proj-card" onclick="go(\''+key+'\')">' +
+      '<div class="pc-row1"><div class="pc-name"><div class="pc-dot" style="background:'+p.color+'"></div>'+p.emoji+' '+p.name+'</div><div class="pc-bal" style="color:'+bc+'">'+fmtN(ps.balance)+'</div></div>' +
+      '<div class="pc-bar"><div class="pc-bar-in" style="width:'+pct+'%;background:'+p.color+';opacity:.85"></div><div class="pc-bar-out" style="width:'+(100-pct)+'%"></div></div>' +
+      '<div class="pc-row2"><div class="pc-stat">Receitas <span style="color:'+p.color+'">'+fmtN(ps.income)+'</span></div><div class="pc-stat">Custos <span style="color:var(--red)">'+fmtN(ps.expense)+'</span></div>' +
+      (fcs2.income?'<div class="pc-stat">Previsto <span style="color:var(--gold)">+'+fmtN(fcs2.income)+'</span></div>':'') +
+      '<div class="pc-stat">Txns <span>'+getTxns(key,y).length+'</span></div></div></div>';
+  }).join('');
+
+  return '<div class="top-bar">'+onlineBadge+'<button onclick="document.getElementById(\'setupScreen\').style.display=\'block\'" style="background:none;border:1px solid var(--border2);color:var(--muted2);padding:5px 10px;border-radius:7px;font-size:10px;cursor:pointer;font-weight:700">⚙ Config</button></div>' +
+    '<div class="kpis">' +
+    '<div class="kpi g"><div class="kpi-label">Total Receitas '+y+'</div><div class="kpi-val g">'+fmtN(s.income)+'</div><div class="kpi-sub">confirmadas</div></div>' +
+    '<div class="kpi r"><div class="kpi-label">Custos Projetos</div><div class="kpi-val r">'+fmtN(s.expense)+'</div></div>' +
+    '<div class="kpi '+(s.balance>=0?'g':'r')+'"><div class="kpi-label">Resultado Real</div><div class="kpi-val '+(s.balance>=0?'g':'r')+'">'+fmtN(s.balance)+'</div></div>' +
+    '<div class="kpi y"><div class="kpi-label">Previsão Entradas</div><div class="kpi-val y">'+fmtN(fcs.income)+'</div></div>' +
+    '<div class="kpi o"><div class="kpi-label">Previsão Custos</div><div class="kpi-val o">'+fmtN(fcs.expense)+'</div></div>' +
+    '<div class="kpi g"><div class="kpi-label">Projeção Total</div><div class="kpi-val g">'+fmtN(s.income+fcs.income-s.expense-fcs.expense)+'</div></div>' +
+    '</div>' +
+    '<div class="chart-box"><h3>📈 Receita Mensal por Projeto — '+y+'</h3><div class="chart-wrap"><canvas id="ovChart"></canvas></div></div>' +
+    renderProfitBox(y) +
+    '<div class="sect">Projetos</div><div class="proj-list">'+projCards+'</div>' +
+    '<div class="sect">Adicionar Transação</div>'+renderForm(null);
+}
+
+function renderProfitBox(y) {
+  var rows=Object.keys(PROJS).map(function(key){
+    var p=PROJS[key], ps=stats(getTxns(key,y)), fcs2=fcStats(getFc(key,y));
+    var real=ps.balance, proj=ps.income+fcs2.income-ps.expense-fcs2.expense;
+    return '<div class="profit-row"><span style="font-size:12px;color:'+p.color+'">'+p.emoji+' '+p.name+'</span>' +
+      '<div style="display:flex;gap:14px"><span style="font-size:11px;color:var(--muted2)">Real: <b style="color:'+(real>=0?'var(--green)':'var(--red)')+'">'+fmtN(real)+'</b></span>' +
+      '<span style="font-size:11px;color:var(--muted2)">Projetado: <b style="color:var(--gold)">'+fmtN(proj)+'</b></span></div></div>';
+  }).join('');
+  var allReal=stats(getTxns(null,y).filter(function(t){return t.proj!=='personal';}));
+  var allFc=fcStats(getFc(null,y));
+  return '<div class="profit-box"><h3>💰 Lucro & Projeção por Projeto</h3>'+rows+
+    '<div class="profit-total"><span style="font-size:12px;font-weight:800;color:var(--green)">Lucro Total Projetado '+y+'</span><span style="font-size:22px;font-weight:900;color:var(--green)">'+fmtN(allReal.income+allFc.income-allReal.expense-allFc.expense)+'</span></div></div>';
+}
+
+function renderProj(proj) {
+  var p=PROJS[proj], y=yr();
+  var allList=getTxns(proj,y), as=stats(allList);
+  var allFcList=getFc(proj,y), fcs=fcStats(allFcList);
+  var list=allList;
+  if(filterM!=='all'){ var fm=parseInt(filterM); list=allList.filter(function(t){return new Date(t.date).getMonth()===fm;}); }
+
+  var mchips=MONTHS.map(function(m,i){
+    var cnt=allList.filter(function(t){return new Date(t.date).getMonth()===i;}).length;
+    return '<button class="chip'+(filterM==i?' on':'')+'" onclick="setM('+i+')" style="'+(cnt===0?'opacity:.3':'')+'">'+ m+(cnt?' ('+cnt+')':'')+'</button>';
+  }).join('');
+
+  var txItems=list.slice().sort(function(a,b){return b.date.localeCompare(a.date);}).map(function(t){
+    var dot=t.type==='in'?p.color:'var(--red)';
+    return '<div class="tx"><div class="tx-l"><div class="tx-dot" style="background:'+dot+'"></div>' +
+      '<div><div class="tx-desc">'+t.desc+'</div><div class="tx-meta">'+t.cat+' · '+new Date(t.date).toLocaleDateString('pt-BR')+'</div></div></div>' +
+      '<div style="display:flex;align-items:center;gap:6px"><div class="tx-amt '+t.type+'">'+(t.type==='in'?'+':'-')+fmtF(t.amount)+'</div>' +
+      '<button class="tx-del" onclick="delTx(\''+t.id+'\')">✕</button></div></div>';
+  }).join('') || '<div class="empty">Sem transações neste período 🤙</div>';
+
+  var fcItems=allFcList.map(function(f){
+    var cls=f.type==='in'?'fc-tx':'fc-tx-out', amtCls=f.type==='in'?'fc-in':'fc-out';
+    return '<div class="tx '+cls+'"><div class="tx-l"><div class="tx-dot" style="background:'+(f.type==='in'?'var(--gold)':'var(--orange)')+'"></div>' +
+      '<div><div class="tx-desc">'+f.desc+' <span class="tag '+(f.type==='in'?'fc':'fc-out')+'">'+(f.type==='in'?'PREVISTO':'CUSTO EST.')+'</span></div>' +
+      '<div class="tx-meta">'+MONTHS[f.month]+' '+f.year+'</div></div></div>' +
+      '<div style="display:flex;align-items:center;gap:6px"><div class="tx-amt '+amtCls+'">'+(f.type==='in'?'+':'-')+fmtF(f.amount)+'</div>' +
+      '<button class="tx-del" onclick="delFc(\''+f.id+'\')">✕</button></div></div>';
+  }).join('') || '<div class="empty" style="padding:16px">Nenhuma previsão ainda.</div>';
+
+  return '<div class="kpis">' +
+    '<div class="kpi" style="border-top:2px solid '+p.color+'"><div class="kpi-label">Receitas '+y+'</div><div class="kpi-val" style="color:'+p.color+'">'+fmtN(as.income)+'</div></div>' +
+    '<div class="kpi r"><div class="kpi-label">Custos '+y+'</div><div class="kpi-val r">'+fmtN(as.expense)+'</div></div>' +
+    '<div class="kpi '+(as.balance>=0?'g':'r')+'"><div class="kpi-label">Lucro Real</div><div class="kpi-val '+(as.balance>=0?'g':'r')+'">'+fmtN(as.balance)+'</div></div>' +
+    '<div class="kpi y"><div class="kpi-label">Prev. Entradas</div><div class="kpi-val y">'+fmtN(fcs.income)+'</div></div>' +
+    '<div class="kpi o"><div class="kpi-label">Prev. Custos</div><div class="kpi-val o">'+fmtN(fcs.expense)+'</div></div>' +
+    '<div class="kpi g"><div class="kpi-label">Lucro Projetado</div><div class="kpi-val g">'+fmtN(as.income+fcs.income-as.expense-fcs.expense)+'</div></div>' +
+    '</div>' +
+    '<div class="chart-box"><h3>📊 Fluxo Mensal — '+p.name+' '+y+'</h3><div class="chart-wrap"><canvas id="pjChart"></canvas></div></div>' +
+    '<div class="sect">Transações Reais</div>' +
+    '<div class="filter-row"><button class="chip'+(filterM==='all'?' on':'')+'" onclick="setM(\'all\')">Todos ('+allList.length+')</button>'+mchips+'</div>' +
+    '<div class="tx-list">'+txItems+'</div>' +
+    '<div class="sect">Previsão & Projeção</div>' +
+    renderFcForm(proj) +
+    '<div class="tx-list">'+fcItems+'</div>' +
+    '<div class="sect">Adicionar Real</div>'+renderForm(proj);
+}
+
+function renderFcForm(proj) {
+  var mOpts=MONTHS.map(function(m,i){return '<option value="'+i+'">'+m+'</option>';}).join('');
+  return '<div class="forecast-grid">' +
+    '<div class="forecast-box" style="border-color:rgba(245,200,66,.3)">' +
+      '<h3 style="color:var(--gold)">🟡 Previsão Entrada</h3>' +
+      '<div style="display:flex;flex-direction:column;gap:8px">' +
+        '<input id="fcDesc_in" type="text" placeholder="Descrição...">' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">' +
+          '<input id="fcAmt_in" type="number" placeholder="Valor ('+sym()+')">' +
+          '<select id="fcMonth_in">'+mOpts+'</select>' +
+        '</div>' +
+        '<button class="fc-btn add-fc-in" onclick="addFc(\'in\',\''+proj+'\')">＋ Adicionar Previsão</button>' +
+      '</div></div>' +
+    '<div class="forecast-box" style="border-color:rgba(255,107,53,.3)">' +
+      '<h3 style="color:var(--orange)">🟠 Previsão Custo</h3>' +
+      '<div style="display:flex;flex-direction:column;gap:8px">' +
+        '<input id="fcDesc_out" type="text" placeholder="Descrição...">' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">' +
+          '<input id="fcAmt_out" type="number" placeholder="Valor ('+sym()+')">' +
+          '<select id="fcMonth_out">'+mOpts+'</select>' +
+        '</div>' +
+        '<button class="fc-btn add-fc-out" onclick="addFc(\'out\',\''+proj+'\')">＋ Adicionar Custo Est.</button>' +
+      '</div></div>' +
+    '</div>';
+}
+
+function renderForm(projDef) {
+  var today=new Date().toISOString().split('T')[0];
+  var pOpts=Object.keys(PROJS).map(function(k){ return '<option value="'+k+'"'+(projDef===k?' selected':'')+'>'+PROJS[k].emoji+' '+PROJS[k].name+'</option>'; }).join('')+'<option value="personal">💳 Gasto Pessoal</option>';
+  var allCats=[]; Object.values(CATS).forEach(function(arr){arr.forEach(function(c){if(allCats.indexOf(c)<0)allCats.push(c);});});
+  var cOpts=allCats.map(function(c){return '<option>'+c+'</option>';}).join('');
+  return '<div class="form-box">' +
+    '<div><label>Projeto</label><select id="fProj">'+pOpts+'</select></div>' +
+    '<div><label>Categoria</label><select id="fCat">'+cOpts+'</select></div>' +
+    '<div class="full"><label>Descrição</label><input id="fDesc" type="text" placeholder="Ex: DJ Class — João 3/4"></div>' +
+    '<div><label>Valor ('+sym()+')</label><input id="fAmt" type="number" placeholder="0.00" min="0" step="0.01"></div>' +
+    '<div><label>Data</label><input id="fDate" type="date" value="'+today+'"></div>' +
+    '<div style="display:flex;align-items:flex-end"><div class="btn-row" style="width:100%">' +
+      '<button class="btn btn-in" onclick="addTx(\'in\')">＋ Entrada</button>' +
+      '<button class="btn btn-out" onclick="addTx(\'out\')">－ Saída</button>' +
+    '</div></div></div>';
+}
+
+// ── CHARTS ──────────────────────────────────────────────────────
+function cOpts2(fn) {
+  return { responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ labels:{ color:'#5a5a8a', font:{ size:10 } } } },
+    scales:{ x:{ grid:{color:'#22223a'}, ticks:{color:'#444',font:{size:10}} }, y:{ grid:{color:'#22223a'}, ticks:{color:'#444',font:{size:10},callback:fn} } } };
+}
+
+function buildCharts() {
+  var y=yr(), tf=function(v){return fmtN(v);};
+  if(tab==='overview') {
+    var ctx=document.getElementById('ovChart'); if(!ctx) return;
+    var ds=Object.keys(PROJS).map(function(key){
+      var p=PROJS[key], md=monthlyData(key,y);
+      return { label:p.short, data:md.map(function(m){return conv(m.in);}), borderColor:p.color, backgroundColor:p.color+'15', fill:true, tension:.4, pointRadius:3, borderWidth:2 };
+    });
+    charts.ov=new Chart(ctx,{type:'line',data:{labels:MONTHS,datasets:ds},options:cOpts2(tf)});
+  } else {
+    var ctx2=document.getElementById('pjChart'); if(!ctx2) return;
+    var p2=PROJS[tab], md2=monthlyData(tab,y);
+    var fcIn=[],fcOut=[]; for(var i=0;i<12;i++){fcIn.push(0);fcOut.push(0);}
+    getFc(tab,y).forEach(function(f){ if(f.type==='in') fcIn[f.month]+=f.amount; else fcOut[f.month]+=f.amount; });
+    charts.pj=new Chart(ctx2,{type:'bar',data:{labels:MONTHS,datasets:[
+      {label:'Entradas',data:md2.map(function(m){return conv(m.in);}),backgroundColor:p2.color+'bb',borderRadius:4},
+      {label:'Saídas',data:md2.map(function(m){return conv(m.out);}),backgroundColor:'#ff475777',borderRadius:4},
+      {label:'Prev. Entrada',data:fcIn.map(function(v){return conv(v);}),backgroundColor:'rgba(245,200,66,.4)',borderColor:'#f5c842',borderWidth:1,borderRadius:4},
+      {label:'Prev. Custo',data:fcOut.map(function(v){return conv(v);}),backgroundColor:'rgba(255,107,53,.35)',borderColor:'#ff6b35',borderWidth:1,borderRadius:4}
+    ]},options:cOpts2(tf)});
+  }
+}
+
+// ── SETUP SCREEN ────────────────────────────────────────────────
+function testAndSaveUrl() {
+  var url = document.getElementById('apiUrlInput').value.trim();
+  if (!url) { showSetupStatus('Cola o URL do Apps Script primeiro.', 'err'); return; }
+  document.getElementById('setupTestBtn').textContent = 'A testar...';
+  fetch(url).then(function(r){ return r.json(); }).then(function(data){
+    if (data.ok || data.status) {
+      apiUrl = url;
+      localStorage.setItem('pmx_api_url', url);
+      showSetupStatus('✅ Ligado com sucesso! A recarregar dados...', 'ok');
+      setTimeout(function(){ document.getElementById('setupScreen').style.display='none'; loadAllData(); }, 1500);
+    } else {
+      showSetupStatus('URL respondeu mas com erro: ' + JSON.stringify(data), 'err');
+    }
+  }).catch(function(e){
+    // CORS error is actually expected and means the URL is working!
+    if (e.toString().includes('Failed to fetch') || e.toString().includes('NetworkError') || e.toString().includes('CORS')) {
+      apiUrl = url;
+      localStorage.setItem('pmx_api_url', url);
+      showSetupStatus('✅ URL guardado! (CORS é normal em Google Apps Script)', 'ok');
+      setTimeout(function(){ document.getElementById('setupScreen').style.display='none'; loadAllData(); }, 1500);
+    } else {
+      showSetupStatus('Erro: ' + e.toString(), 'err');
+    }
+  }).finally(function(){
+    document.getElementById('setupTestBtn').textContent = 'Testar & Guardar';
+  });
+}
+
+function showSetupStatus(msg, type) {
+  var el = document.getElementById('setupStatus');
+  el.textContent = msg;
+  el.className = 'setup-status ' + type;
+}
+
+// ── INIT ────────────────────────────────────────────────────────
+document.getElementById('curSel').value = currency;
+initPin();
+</script>
+</body>
+</html>
