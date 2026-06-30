@@ -1,0 +1,11 @@
+{
+  "name": "pomadex-finance",
+  "version": "10.0.0",
+  "description": "Pomadex Finance System v10 — Professional financial management for Pomadex Productions",
+  "homepage": "https://pomadexproductions.github.io/finance",
+  "author": "Pedro Maximo — Pomadex Productions",
+  "private": true,
+  "scripts": {
+    "start": "npx serve ."
+  }
+}
